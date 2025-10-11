@@ -11,7 +11,7 @@ namespace CanHazFunny
         private IOutput Output { get; }
         private IJokeService JokeService { get; }
 
-        public Jester(IOutput output, IJokeService jokeService)
+        public Jester(IOutput? output, IJokeService? jokeService)
         {
             Output = output ?? throw new ArgumentNullException(nameof(output));
             JokeService = jokeService ?? throw new ArgumentNullException(nameof(jokeService));
