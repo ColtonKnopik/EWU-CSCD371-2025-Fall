@@ -51,6 +51,21 @@ public class JesterTests
         Assert.Equal("This is a mock joke.", output.LastWrittenLine);
     }
 
+    [Fact]
+    public void Jester_TellJoke_DoesNotContainChuckNorris()
+    {
+        // Arrange
+        var output = new MockOutput();
+        var jokeService = new ChuckNorrisMockJokeService();
+        var jester = new Jester(output, jokeService);
+        // Act
+        jester.TellJoke();
+        // Assert
+        Assert.True(output.WriteLineCalled);
+        Assert.DoesNotContain("Chuck Norris", output.LastWrittenLine ?? string.Empty);
+    }
+
+
 }
 
 // Mock implementation of IOutput for testing
@@ -72,5 +87,13 @@ public class MockJokeService : IJokeService
     public string GetJoke()
     {
         return "This is a mock joke.";
+    }
+}
+
+public class ChuckNorrisMockJokeService : IJokeService
+{
+    public string GetJoke()
+    {
+        return "This is a Chuck Norris joke.";
     }
 }
