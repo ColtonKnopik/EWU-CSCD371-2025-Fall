@@ -8,6 +8,6 @@ namespace CanHazFunny
 {
     public interface IOutput
     {
-        string WriteLine(string message);
+        void WriteLine(string message);
     }
 }
