@@ -92,8 +92,18 @@ public class MockJokeService : IJokeService
 
 public class ChuckNorrisMockJokeService : IJokeService
 {
+    private int callCount = 0;
+
     public string GetJoke()
     {
-        return "This is a Chuck Norris joke.";
+        if (callCount == 0)
+        {
+            callCount++;
+            return "This is a Chuck Norris joke.";
+        }
+        else
+        {
+            return "This is a regular joke.";
+        }
     }
 }
