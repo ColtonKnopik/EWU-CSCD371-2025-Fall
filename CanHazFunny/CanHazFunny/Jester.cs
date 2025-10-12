@@ -32,4 +32,4 @@ public class Jester
             Output.WriteLine(joke);
         }
     }
-}
+
