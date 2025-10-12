@@ -4,23 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CanHazFunny
+namespace CanHazFunny;
+
+public class Jester
 {
-    public class Jester
+    private IOutput Output { get; }
+    private IJokeService JokeService { get; }
+
+    public Jester(IOutput? output, IJokeService? jokeService)
     {
-        private IOutput Output { get; }
-        private IJokeService JokeService { get; }
+        Output = output ?? throw new ArgumentNullException(nameof(output));
+        JokeService = jokeService ?? throw new ArgumentNullException(nameof(jokeService));
+    }
 
-        public Jester(IOutput? output, IJokeService? jokeService)
-        {
-            Output = output ?? throw new ArgumentNullException(nameof(output));
-            JokeService = jokeService ?? throw new ArgumentNullException(nameof(jokeService));
-        }
-
-        public void TellJoke()
-        {
-            string joke = JokeService.GetJoke();
-            Output.WriteLine(joke);
-        }
+    public void TellJoke()
+    {
+        string joke = JokeService.GetJoke();
+        Output.WriteLine(joke);
     }
 }
