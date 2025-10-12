@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CanHazFunny
+namespace CanHazFunny;
+
+public interface IOutput
 {
-    public interface IOutput
-    {
-        void WriteLine(string message);
-    }
+    void WriteLine(string message);
 }
