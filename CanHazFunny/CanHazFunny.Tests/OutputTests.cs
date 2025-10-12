@@ -1,7 +1,7 @@
 ﻿using Xunit;
 using System;
 
-namespace CanHazFunny.Tests
+namespace CanHazFunny.Tests;
 {
     public class OutputTests
     {
