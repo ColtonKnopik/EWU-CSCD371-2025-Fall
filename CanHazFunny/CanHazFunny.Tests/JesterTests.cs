@@ -92,7 +92,7 @@ public class MockJokeService : IJokeService
 
 public class ChuckNorrisMockJokeService : IJokeService
 {
-    private int callCount = 0;
+    private int callCount;
 
     public string GetJoke()
     {
