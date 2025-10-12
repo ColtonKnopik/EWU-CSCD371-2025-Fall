@@ -6,5 +6,9 @@ sealed class Program
     {
         //Feel free to use your own setup here - this is just provided as an example
         //new Jester(new SomeReallyCoolOutputClass(), new SomeJokeServiceClass()).TellJoke();
+        IOutput output = new ConsoleOutput();
+        IJokeService jokeService = new JokeService();
+        Jester jester = new Jester(output, jokeService);
+        jester.TellJoke();
     }
 }
