@@ -19,7 +19,16 @@ namespace CanHazFunny
 
         public void TellJoke()
         {
-            string joke = JokeService.GetJoke();
+            string joke;
+            bool containsChuckNorrisJoke;
+
+            do
+            {
+                joke = JokeService.GetJoke();
+                containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
+
+            } while (containsChuckNorrisJoke);
+            
             Output.WriteLine(joke);
         }
     }
