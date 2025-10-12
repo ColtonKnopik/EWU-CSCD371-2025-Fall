@@ -17,9 +17,19 @@ public class Jester
         JokeService = jokeService ?? throw new ArgumentNullException(nameof(jokeService));
     }
 
-    public void TellJoke()
-    {
-        string joke = JokeService.GetJoke();
-        Output.WriteLine(joke);
+        public void TellJoke()
+        {
+            string joke;
+            bool containsChuckNorrisJoke;
+
+            do
+            {
+                joke = JokeService.GetJoke();
+                containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
+
+            } while (containsChuckNorrisJoke);
+            
+            Output.WriteLine(joke);
+        }
     }
-}
+
