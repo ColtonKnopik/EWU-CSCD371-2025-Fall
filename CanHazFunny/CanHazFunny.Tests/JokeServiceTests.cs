@@ -35,7 +35,7 @@ public class JokeServiceTests
         }
     }
 
-    private class FakeHttpMessageHandler : HttpMessageHandler
+    private sealed class FakeHttpMessageHandler : HttpMessageHandler
     {
         private readonly string _responseContent;
 
@@ -54,7 +54,7 @@ public class JokeServiceTests
         }
     }
 
-    private class IsolatedJokeService : IJokeService
+    private sealed class IsolatedJokeService : IJokeService
     {
         private HttpClient HttpClient { get; }
 
