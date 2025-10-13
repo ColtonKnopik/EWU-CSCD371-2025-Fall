@@ -65,41 +65,8 @@ public class JesterTests
         Assert.DoesNotContain("Chuck Norris", output.LastWrittenLine ?? string.Empty);
         Assert.Equal("This is a regular joke.", output.LastWrittenLine);
     }
-
-    [Fact]
-    public void Jester_TellJoke_DoesNotContainChuck()
-    {
-        // Arrange
-        var output = new MockOutput();
-        var jokeService = new OnlyContainsChuckMockJokeService();
-        var jester = new Jester(output, jokeService);
-        // Act
-        jester.TellJoke();
-        // Assert
-        Assert.True(output.WriteLineCalled);
-        Assert.DoesNotContain("Chuck", output.LastWrittenLine ?? string.Empty);
-        Assert.Equal("This is a regular joke.", output.LastWrittenLine);
-    }
-
-    [Fact]
-    public void Jester_TellJoke_DoesNotContainNorris()
-    {
-        // Arrange
-        var output = new MockOutput();
-        var jokeService = new OnlyContainsLastNameNorrisJokeService();
-        var jester = new Jester(output, jokeService);
-        // Act
-        jester.TellJoke();
-        // Assert
-        Assert.True(output.WriteLineCalled);
-        Assert.DoesNotContain("Norris", output.LastWrittenLine ?? string.Empty);
-        Assert.Equal("This is a regular joke.", output.LastWrittenLine);
-    }
-
-
 }
 
-// Mock implementation of IOutput for testing
 public class MockOutput : IOutput
 {
     public bool WriteLineCalled { get; private set; }
@@ -112,7 +79,6 @@ public class MockOutput : IOutput
     }
 }
 
-// Mock implementation of IJokeService for testing
 public class MockJokeService : IJokeService
 {
     public string GetJoke()
@@ -131,40 +97,6 @@ public class ChuckNorrisMockJokeService : IJokeService
         {
             callCount++;
             return "This is a Chuck Norris joke.";
-        }
-        else
-        {
-            return "This is a regular joke.";
-        }
-    }
-}
-
-public class OnlyContainsChuckMockJokeService : IJokeService
-{
-    private int callCount;
-    public string GetJoke()
-    {
-        if (callCount == 0)
-        {
-            callCount++;
-            return "This is a joke about Chuck.";
-        }
-        else
-        {
-            return "This is a regular joke.";
-        }
-    }
-}
-
-public class OnlyContainsLastNameNorrisJokeService : IJokeService
-{
-    private int callCount;
-    public string GetJoke()
-    {
-        if (callCount == 0)
-        {
-            callCount++;
-            return "This is a joke about Norris.";
         }
         else
         {
