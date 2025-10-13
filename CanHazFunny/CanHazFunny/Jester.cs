@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-
 namespace CanHazFunny;
 
 public class Jester
@@ -25,13 +23,11 @@ public class Jester
             do
             {
                 joke = JokeService.GetJoke();
-                containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase) ||
-                                          joke.Contains("Chuck", StringComparison.OrdinalIgnoreCase) ||
-                                          joke.Contains("Norris", StringComparison.OrdinalIgnoreCase);
+                containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
 
-        } while (containsChuckNorrisJoke);
+            } while (containsChuckNorrisJoke);
 
-        Output.WriteLine(joke);
+            Output.WriteLine(joke);
         }
     }
 

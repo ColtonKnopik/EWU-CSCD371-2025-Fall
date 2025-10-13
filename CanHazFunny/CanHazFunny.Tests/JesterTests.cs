@@ -63,12 +63,10 @@ public class JesterTests
         // Assert
         Assert.True(output.WriteLineCalled);
         Assert.DoesNotContain("Chuck Norris", output.LastWrittenLine ?? string.Empty);
+        Assert.Equal("This is a regular joke.", output.LastWrittenLine);
     }
-
-
 }
 
-// Mock implementation of IOutput for testing
 public class MockOutput : IOutput
 {
     public bool WriteLineCalled { get; private set; }
@@ -81,7 +79,6 @@ public class MockOutput : IOutput
     }
 }
 
-// Mock implementation of IJokeService for testing
 public class MockJokeService : IJokeService
 {
     public string GetJoke()
