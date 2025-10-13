@@ -67,7 +67,6 @@ public class JesterTests
     }
 }
 
-// Mock implementation of IOutput for testing
 public class MockOutput : IOutput
 {
     public bool WriteLineCalled { get; private set; }
@@ -80,7 +79,6 @@ public class MockOutput : IOutput
     }
 }
 
-// Mock implementation of IJokeService for testing
 public class MockJokeService : IJokeService
 {
     public string GetJoke()
