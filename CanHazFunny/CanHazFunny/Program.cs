@@ -4,9 +4,6 @@ sealed class Program
 {
     static void Main(string[] args)
     {
-        IOutput output = new ConsoleOutput();
-        IJokeService jokeService = new JokeService();
-        Jester jester = new Jester(output, jokeService);
-        jester.TellJoke();
+        new Jester(new ConsoleOutput(), new JokeService()).TellJoke();
     }
 }
