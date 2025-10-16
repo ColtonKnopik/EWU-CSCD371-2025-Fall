@@ -74,7 +74,10 @@ public class JokeServiceTests
     [Fact]
     public void JokeService_GetJoke_ReturnsNonEmptyString_IntegrationTest()
     {
-        var jokeService = new JokeService();
+        // Changed to use a mocked HTTP handler so the test is deterministic and does not call the external API.
+        var mockHandler = new FakeHttpMessageHandler(ValidJokeJson);
+        var jokeService = new IsolatedJokeService(mockHandler);
+
         string joke = jokeService.GetJoke();
         Assert.False(string.IsNullOrWhiteSpace(joke));
     }
