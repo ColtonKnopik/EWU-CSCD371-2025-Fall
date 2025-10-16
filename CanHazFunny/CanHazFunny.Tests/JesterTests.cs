@@ -1,5 +1,6 @@
 using System;
 using Xunit;
+using static CanHazFunny.Tests.ChuckNorrisMockJokeService;
 
 namespace CanHazFunny.Tests;
 
@@ -65,6 +66,34 @@ public class JesterTests
         Assert.DoesNotContain("Chuck Norris", output.LastWrittenLine ?? string.Empty);
         Assert.Equal("This is a regular joke.", output.LastWrittenLine);
     }
+
+    [Fact]
+    public void Jester_TellJoke_TimesOutAfter5Seconds()
+    {
+        // Arrange
+        var output = new MockOutput();
+        var jokeService = new OnlyChuckNorrisJokesMockJokeService();
+        var jester = new Jester(output, jokeService);
+        // Act
+        jester.TellJoke();
+        // Assert
+        Assert.False(output.WriteLineCalled, "Output should not be called when a valid joke is not found before timeout.");
+        Assert.Null(output.LastWrittenLine);
+    }
+
+    [Fact]
+    public void Jester_TellJoke_JokeServiceThrowsError_NoOutput()
+    {
+        //Arrange
+        var output = new MockOutput();
+        var jokeService = new ErrorThrowingMockJokeService();
+        var jester = new Jester(output, jokeService);
+        // Act
+        jester.TellJoke();
+        // Assert
+        Assert.False(output.WriteLineCalled, "Output should not be called when JokeService throws an error.");
+        Assert.Null(output.LastWrittenLine);
+    }
 }
 
 public class MockOutput : IOutput
@@ -101,6 +130,30 @@ public class ChuckNorrisMockJokeService : IJokeService
         else
         {
             return "This is a regular joke.";
+        }
+    }
+
+    public class OnlyChuckNorrisJokesMockJokeService : IJokeService
+    {
+        public string GetJoke()
+        {
+            System.Threading.Thread.Sleep(10);
+            return "The joke train is full of Chuck Norris jokes.";
+        }
+    }
+
+    public class ErrorThrowingMockJokeService : IJokeService
+    {
+        private int callCount;
+        public string GetJoke()
+        {
+            if (callCount == 0)
+            {
+                callCount++;
+                throw new InvalidOperationException("Simulated API failure.");
+            }
+
+            return string.Empty;
         }
     }
 }

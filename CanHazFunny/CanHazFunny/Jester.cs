@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace CanHazFunny;
 
@@ -15,23 +16,32 @@ public class Jester
 
     public void TellJoke()
     {
-        const int MaxAttempts = 10;
-        int attempt = 0;
+        TimeSpan maxTimeLimit = TimeSpan.FromSeconds(5);
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         string joke = string.Empty;
         bool containsChuckNorrisJoke;
 
-        do
-        {
-            joke = JokeService.GetJoke() ?? string.Empty;
-            containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
-            attempt++;
-        } while (containsChuckNorrisJoke && attempt < MaxAttempts);
+        containsChuckNorrisJoke = true;
 
-        if (containsChuckNorrisJoke)
+        while (containsChuckNorrisJoke && stopwatch.Elapsed < maxTimeLimit)
         {
-            Output.Write("No appropriate joke could be retrieved.");
+            try
+            {
+                joke = JokeService.GetJoke() ?? string.Empty;
+            }
+            catch (InvalidOperationException)
+            {
+                break;
+            }
+
+            containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
         }
-        else
+
+        stopwatch.Stop();
+
+        if (!containsChuckNorrisJoke)
         {
             Output.Write(joke);
         }
