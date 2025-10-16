@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+
 namespace CanHazFunny;
 
 public class Jester
@@ -15,19 +13,28 @@ public class Jester
         JokeService = jokeService ?? throw new ArgumentNullException(nameof(jokeService));
     }
 
-        public void TellJoke()
+    public void TellJoke()
+    {
+        const int MaxAttempts = 10;
+        int attempt = 0;
+        string joke = string.Empty;
+        bool containsChuckNorrisJoke;
+
+        do
         {
-            string joke;
-            bool containsChuckNorrisJoke;
+            joke = JokeService.GetJoke() ?? string.Empty;
+            containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
+            attempt++;
+        } while (containsChuckNorrisJoke && attempt < MaxAttempts);
 
-            do
-            {
-                joke = JokeService.GetJoke();
-                containsChuckNorrisJoke = joke.Contains("Chuck Norris", StringComparison.OrdinalIgnoreCase);
-
-            } while (containsChuckNorrisJoke);
-
+        if (containsChuckNorrisJoke)
+        {
+            Output.Write("No appropriate joke could be retrieved.");
+        }
+        else
+        {
             Output.Write(joke);
         }
     }
+}
 
