@@ -14,7 +14,7 @@ public class OutputTests
         using var consoleOutput = new System.IO.StringWriter();
         Console.SetOut(consoleOutput);
         // Act
-        output.WriteLine(message);
+        output.Write(message);
         // Assert
         Assert.Equal(message + Environment.NewLine, consoleOutput.ToString());
     }
@@ -28,7 +28,7 @@ public class OutputTests
         using var consoleOutput = new System.IO.StringWriter();
         Console.SetOut(consoleOutput);
         // Act
-        output.WriteLine(message);
+        output.Write(message);
         // Assert
         Assert.Equal(Environment.NewLine, consoleOutput.ToString());
     }

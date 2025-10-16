@@ -72,7 +72,7 @@ public class MockOutput : IOutput
     public bool WriteLineCalled { get; private set; }
     public string? LastWrittenLine { get; private set; }
 
-    public void WriteLine(string message)
+    public void Write(string message)
     {
         WriteLineCalled = true;
         LastWrittenLine = message;

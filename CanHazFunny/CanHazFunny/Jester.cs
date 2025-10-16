@@ -27,7 +27,7 @@ public class Jester
 
             } while (containsChuckNorrisJoke);
 
-            Output.WriteLine(joke);
+            Output.Write(joke);
         }
     }
 
