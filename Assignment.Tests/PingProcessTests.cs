@@ -83,10 +83,21 @@ public class PingProcessTests
 
 
     [TestMethod]
-    // Using expected exception wouldn't work for some reason so this test is very strange and I need to change it.
-    // TODO: Fix this test
     public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrapping()
     {
+        CancellationTokenSource cancellationTokenSource = new();
+        cancellationTokenSource.Cancel();
+        Task<PingResult> task = Sut.RunAsync("localhost", cancellationTokenSource.Token);
+        Assert.Throws<AggregateException>(() =>
+        {
+            PingResult result = task.Result;
+        });
+    }
+
+    [TestMethod]
+    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrappingTaskCanceledException()
+    {
+        // Use exception.Flatten()
         CancellationTokenSource cancellationTokenSource = new();
         cancellationTokenSource.Cancel();
         Task<PingResult> task = Sut.RunAsync("localhost", cancellationTokenSource.Token);
@@ -95,18 +106,12 @@ public class PingProcessTests
             PingResult result = task.Result;
             Assert.Fail("Expected exception was not thrown.");
         }
-        catch(AggregateException ex)
+        catch (AggregateException ex)
         {
-            Assert.IsInstanceOfType(ex.InnerException, typeof(TaskCanceledException));
+            AggregateException flattened = ex.Flatten();
+            Assert.IsTrue(flattened.InnerExceptions.Any(e => e is TaskCanceledException),
+                "Expected TaskCanceledException was not found in InnerExceptions.");
         }
-    }
-
-    [TestMethod]
-    // Commented out because I kept getting build errors due to this
-    //[ExpectedException(typeof(TaskCanceledException))]
-    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrappingTaskCanceledException()
-    {
-        // Use exception.Flatten()
     }
 
     [TestMethod]
