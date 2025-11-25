@@ -1,6 +1,7 @@
 ﻿// This code was originally sourced from https://github.com/PowerShell/PowerShell/blob/main/src/System.Management.Automation/engine/regex.cs
 // and then modified to remove of PowerShell specific elements.
 #nullable disable // Nullable not supported in this legacy file.
+#pragma warning disable CA1852, CA2201, CA1310, CA2263, IDE0161, CA1711
 
 using System;
 using System.Collections.Generic;

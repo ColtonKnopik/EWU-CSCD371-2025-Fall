@@ -7,11 +7,4 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
   </PropertyGroup>
-
-	<ItemGroup>
-		<!-- Suppress all warnings for WildcardPattern.cs -->
-		<Compile Update="**\WildcardPattern.cs">
-			<NoWarn>$(NoWarn)</NoWarn>
-		</Compile>
-	</ItemGroup>
 </Project>
