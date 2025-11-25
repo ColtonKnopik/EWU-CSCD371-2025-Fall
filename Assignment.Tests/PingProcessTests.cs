@@ -165,4 +165,77 @@ Approximate round trip times in milli-seconds:
     }
     private void AssertValidPingOutput(PingResult result) =>
         AssertValidPingOutput(result.ExitCode, result.StdOutput);
+
+    [TestMethod]
+    public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+
+        // Act
+        int result = await ping.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        // Assert
+        Assert.AreEqual(0, result);
+    }
+
+    [TestMethod]
+    public async Task RunLongRunningAsync_OutputProduced_ProgressOutputInvoked()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+
+        int count = 0;
+        void output(string? line)
+        {
+            if (line != null)
+                count++;
+        }
+
+        // Act
+        await ping.RunLongRunningAsync(
+            psi,
+            progressOutput: output,
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        // Assert
+        Assert.IsGreaterThan(0, count, "Expected progressOutput to be invoked at least once.");
+    }
+
+    [TestMethod]
+    public void RunLongRunningAsync_Cancelled_ThrowsAggregateException()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+        var cts = new CancellationTokenSource();
+
+        // Act
+        var task = ping.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: cts.Token);
+
+        cts.Cancel();
+
+        // Assert
+        try
+        {
+            task.Wait();
+            Assert.Fail("Expected AggregateException was not thrown.");
+        }
+        catch (AggregateException ex)
+        {
+            Assert.IsInstanceOfType(ex.InnerException, typeof(TaskCanceledException));
+        }
+    }
+
 }

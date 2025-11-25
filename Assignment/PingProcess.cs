@@ -81,6 +81,34 @@ public class PingProcess
         return await task;
     }
 
+    // 5
+    public Task<int> RunLongRunningAsync(
+    ProcessStartInfo startInfo,
+    Action<string?>? progressOutput,
+    Action<string?>? progressError,
+    CancellationToken token)
+    {
+        return Task.Factory.StartNew(() =>
+        {
+            token.ThrowIfCancellationRequested();
+
+            var process = new Process
+            {
+                StartInfo = UpdateProcessStartInfo(startInfo)
+            };
+
+            var resultProcess = RunProcessInternal(
+                process,
+                progressOutput,
+                progressError,
+                token);
+
+            return resultProcess.ExitCode;
+
+        }, token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
+    }
+
+
 
     private Process RunProcessInternal(
         ProcessStartInfo startInfo,
