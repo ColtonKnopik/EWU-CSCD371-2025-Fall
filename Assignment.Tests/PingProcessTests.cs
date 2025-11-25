@@ -221,7 +221,7 @@ Approximate round trip times in milli-seconds:
         }
         catch (AggregateException ex)
         {
-            Assert.IsInstanceOfType(ex.InnerException, typeof(TaskCanceledException));
+            Assert.IsInstanceOfType<TaskCanceledException>(ex.InnerException);
         }
     }
 }
