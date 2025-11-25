@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Assignment.Tests;
@@ -88,7 +89,7 @@ public class PingProcessTests
     //[ExpectedException(typeof(AggregateException))]
     public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrapping()
     {
-        
+
     }
 
     [TestMethod]
@@ -104,7 +105,7 @@ public class PingProcessTests
     {
         // Pseudo Code - don't trust it!!!
         string[] hostNames = new string[] { "localhost", "localhost", "localhost", "localhost" };
-        int expectedLineCount = PingOutputLikeExpression.Split(Environment.NewLine).Length*hostNames.Length;
+        int expectedLineCount = PingOutputLikeExpression.Split(Environment.NewLine).Length * hostNames.Length;
         PingResult result = await Sut.RunAsync(hostNames);
         int? lineCount = result.StdOutput?.Split(Environment.NewLine).Length;
         Assert.AreEqual(expectedLineCount, lineCount);
@@ -127,7 +128,7 @@ public class PingProcessTests
         System.Text.StringBuilder stringBuilder = new();
         numbers.AsParallel().ForAll(item => stringBuilder.AppendLine(""));
         int lineCount = stringBuilder.ToString().Split(Environment.NewLine).Length;
-        Assert.AreNotEqual(lineCount, numbers.Count()+1);
+        Assert.AreNotEqual(lineCount, numbers.Count() + 1);
     }
 
     readonly string PingOutputLikeExpression = @"
@@ -145,10 +146,82 @@ Approximate round trip times in milli-seconds:
     {
         Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
         stdOutput = WildcardPattern.NormalizeLineEndings(stdOutput!.Trim());
-        Assert.IsTrue(stdOutput?.IsLike(PingOutputLikeExpression)??false,
+        Assert.IsTrue(stdOutput?.IsLike(PingOutputLikeExpression) ?? false,
             $"Output is unexpected: {stdOutput}");
         Assert.AreEqual<int>(0, exitCode);
     }
     private void AssertValidPingOutput(PingResult result) =>
         AssertValidPingOutput(result.ExitCode, result.StdOutput);
+
+    [TestMethod]
+    public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+
+        // Act
+        int result = await ping.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        // Assert
+        Assert.AreEqual(0, result);
+    }
+
+    [TestMethod]
+    public async Task RunLongRunningAsync_OutputProduced_ProgressOutputInvoked()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+
+        int count = 0;
+        void output(string? line)
+        {
+            if (line != null)
+                count++;
+        }
+
+        // Act
+        await ping.RunLongRunningAsync(
+            psi,
+            progressOutput: output,
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        // Assert
+        Assert.IsGreaterThan(0, count, "Expected progressOutput to be invoked at least once.");
+    }
+
+    [TestMethod]
+    public void RunLongRunningAsync_Cancelled_ThrowsAggregateException()
+    {
+        // Arrange
+        var ping = new PingProcess();
+        var psi = new ProcessStartInfo("ping", "localhost");
+        var cts = new CancellationTokenSource();
+
+        // Act
+        var task = ping.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: cts.Token);
+
+        cts.Cancel();
+
+        // Assert
+        try
+        {
+            task.Wait();
+            Assert.Fail("Expected AggregateException was not thrown.");
+        }
+        catch (AggregateException ex)
+        {
+            Assert.IsInstanceOfType(ex.InnerException, typeof(TaskCanceledException));
+        }
+    }
 }
