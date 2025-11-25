@@ -44,7 +44,8 @@ public class PingProcess
         return await task;
     }
 
-
+// Dont forget to fix this warning
+#pragma warning disable CA1822
     async public Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
     {
         StringBuilder? stringBuilder = null;
@@ -61,6 +62,7 @@ public class PingProcess
         int total = all.Aggregate(0, (total, item) => total + item.Result);
         return new PingResult(total, stringBuilder?.ToString());
     }
+#pragma warning restore CA1822
 
     async public Task<PingResult> RunLongRunningAsync(
         string hostNameOrAddress, CancellationToken cancellationToken = default)
