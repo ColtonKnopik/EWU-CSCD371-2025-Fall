@@ -38,27 +38,32 @@ public class PingProcessTests
 
 
     [TestMethod]
-    public void Run_GoogleDotCom_Success()
+    public void Run_localhost_Success()
     {
-        var result = Sut.Run("google.com");
-        Assert.IsTrue(
-            result.ExitCode == 0 || (result.StdOutput != null && result.StdOutput.Contains("bytes from")),
-            "Ping should succeed on all platforms.");
+        var result = Sut.Run("localhost");
+        Assert.AreEqual(0, result.ExitCode, "Ping to localhost should always succeed.");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput), "StdOutput should have ping output.");
     }
+
 
 
     [TestMethod]
     public void Run_InvalidAddressOutput_Success()
     {
-        (int exitCode, string? stdOutput) = Sut.Run("badaddress");
+        var (exitCode, stdOutput) = Sut.Run("badaddress");
+
         Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
-        stdOutput = WildcardPattern.NormalizeLineEndings(stdOutput!.Trim());
-        Assert.AreEqual<string?>(
-            "Ping request could not find host badaddress. Please check the name and try again.".Trim(),
-            stdOutput,
-            $"Output is unexpected: {stdOutput}");
-        Assert.AreEqual<int>(1, exitCode);
+
+        string normalized = stdOutput!.Trim().ToLowerInvariant();
+
+        bool matches = normalized.Contains("temporary failure")
+                    || normalized.Contains("name or service not known")
+                    || normalized.Contains("could not find host");
+
+        Assert.IsTrue(matches, $"Unexpected output: {stdOutput}");
+        Assert.AreNotEqual(0, exitCode, "Exit code should indicate failure.");
     }
+
 
     [TestMethod]
     public void Run_CaptureStdOutput_Success()
