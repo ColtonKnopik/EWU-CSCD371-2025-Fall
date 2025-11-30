@@ -15,6 +15,7 @@ public class PingProcess
 {
     private void SetPingArguments(string host)
     {
+        StartInfo.Arguments = string.Empty;
         StartInfo.ArgumentList.Clear();
 
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
@@ -196,11 +197,7 @@ public class PingProcess
             {
                 return process;
             }
-            process.WaitForExit(5000); 
-            if (!process.HasExited)
-            {
-                try { process.Kill(); } catch { }
-            }
+            process.WaitForExit(); 
 
         }
         catch (Exception e)
