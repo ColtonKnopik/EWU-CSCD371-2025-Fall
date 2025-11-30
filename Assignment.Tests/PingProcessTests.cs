@@ -270,8 +270,6 @@ Approximate round trip times in milli-seconds:
             $"Output is unexpected: {stdOutput}");
         Assert.AreEqual<int>(0, exitCode);
     }
-    private void AssertValidPingOutput(PingResult result) =>
-        AssertValidPingOutput(result.ExitCode, result.StdOutput);
 
     [TestMethod]
     public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
