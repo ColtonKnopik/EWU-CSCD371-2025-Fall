@@ -248,29 +248,6 @@ public class PingProcessTests
         );
     }
 
-
-
-
-    readonly string PingOutputLikeExpression = @"
-Pinging * with 32 bytes of data:
-Reply from ::1: time<*
-Reply from ::1: time<*
-Reply from ::1: time<*
-Reply from ::1: time<*
-
-Ping statistics for ::1:
-    Packets: Sent = *, Received = *, Lost = 0 (0% loss),
-Approximate round trip times in milli-seconds:
-    Minimum = *, Maximum = *, Average = *".Trim();
-    private void AssertValidPingOutput(int exitCode, string? stdOutput)
-    {
-        Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
-        stdOutput = WildcardPattern.NormalizeLineEndings(stdOutput!.Trim());
-        Assert.IsTrue(stdOutput?.IsLike(PingOutputLikeExpression) ?? false,
-            $"Output is unexpected: {stdOutput}");
-        Assert.AreEqual<int>(0, exitCode);
-    }
-
     [TestMethod]
     public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
     {
