@@ -13,11 +13,32 @@ public record struct PingResult(int ExitCode, string? StdOutput);
 
 public class PingProcess
 {
+    private void SetPingArguments(string host)
+    {
+        StartInfo.ArgumentList.Clear();
+
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            // On Linux/macOS: ping -c 1 <host>
+            StartInfo.ArgumentList.Add("-c");
+            StartInfo.ArgumentList.Add("1");
+            StartInfo.ArgumentList.Add(host);
+        }
+        else
+        {
+            // On Windows: ping -n 1 <host>
+            StartInfo.ArgumentList.Add("-n");
+            StartInfo.ArgumentList.Add("1");
+            StartInfo.ArgumentList.Add(host);
+        }
+    }
+
+
     private ProcessStartInfo StartInfo { get; } = new("ping");
 
     public PingResult Run(string hostNameOrAddress)
     {
-        StartInfo.Arguments = hostNameOrAddress;
+        SetPingArguments(hostNameOrAddress);
         StringBuilder? stringBuilder = null;
         void updateStdOutput(string? line) =>
             (stringBuilder??=new StringBuilder()).AppendLine(line);
@@ -44,22 +65,35 @@ public class PingProcess
         return await task;
     }
 
-
-    async public Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
+    public async Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
     {
-        StringBuilder? stringBuilder = null;
-        ParallelQuery<Task<int>>? all = hostNameOrAddresses.AsParallel().Select(async item =>
-        {
-            Task<PingResult> task = null!;
-            // ...
+        if (hostNameOrAddresses == null || hostNameOrAddresses.Length == 0)
+            throw new ArgumentException("At least one host must be provided.");
 
-            await task.WaitAsync(default(CancellationToken));
-            return task.Result.ExitCode;
-        });
+        var outputs = new StringBuilder();
+        var lockObj = new object();
 
-        await Task.WhenAll(all);
-        int total = all.Aggregate(0, (total, item) => total + item.Result);
-        return new PingResult(total, stringBuilder?.ToString());
+        var tasks = hostNameOrAddresses
+            .Select(async host =>
+            {
+                var result = await RunAsync(host);
+                if (!string.IsNullOrWhiteSpace(result.StdOutput))
+                {
+                    lock (lockObj)
+                    {
+                        outputs.AppendLine(result.StdOutput);
+                    }
+                }
+
+                return result.ExitCode;
+            })
+            .ToList();
+
+
+        int[] exitCodes = await Task.WhenAll(tasks);
+        int total = exitCodes.Sum();
+
+        return new PingResult(total, outputs.ToString());
     }
 
     async public Task<PingResult> RunLongRunningAsync(
@@ -74,6 +108,33 @@ public class PingProcess
         }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Current);
 
         return await task;
+    }
+
+    // 5
+    public Task<int> RunLongRunningAsync(
+    ProcessStartInfo startInfo,
+    Action<string?>? progressOutput,
+    Action<string?>? progressError,
+    CancellationToken token)
+    {
+        return Task.Factory.StartNew(() =>
+        {
+            token.ThrowIfCancellationRequested();
+
+            var process = new Process
+            {
+                StartInfo = UpdateProcessStartInfo(startInfo)
+            };
+
+            var resultProcess = RunProcessInternal(
+                process,
+                progressOutput,
+                progressError,
+                token);
+
+            return resultProcess.ExitCode;
+
+        }, token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
     }
 
 
@@ -136,7 +197,12 @@ public class PingProcess
             {
                 return process;
             }
-            process.WaitForExit();
+            process.WaitForExit(5000); 
+            if (!process.HasExited)
+            {
+                try { process.Kill(); } catch { }
+            }
+
         }
         catch (Exception e)
         {
