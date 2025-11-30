@@ -197,7 +197,12 @@ public class PingProcess
             {
                 return process;
             }
-            process.WaitForExit();
+            process.WaitForExit(5000); 
+            if (!process.HasExited)
+            {
+                try { process.Kill(); } catch { }
+            }
+
         }
         catch (Exception e)
         {
