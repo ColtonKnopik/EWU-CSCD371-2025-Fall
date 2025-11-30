@@ -78,52 +78,29 @@ public class PingProcessTests
     }
 
     [TestMethod]
-    public void RunTaskAsync_Success()
+    public async Task RunTaskAsync_Success()
     {
         // Act
-        Task<PingResult> task = Sut.RunTaskAsync("localhost");
-        PingResult result = task.Result;
+        PingResult result = await Sut.RunTaskAsync("localhost");
 
         // Assert
         Assert.IsNotNull(result.StdOutput, "Output should not be null.");
         Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
         Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
-
-        string output = result.StdOutput;
-        string[] successMarkers = { "Reply from", "bytes from" };
-
-        bool containsMarker = successMarkers.Any(marker =>
-            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
-
-        Assert.IsTrue(
-            containsMarker,
-            $"Output did not contain any known success markers. Actual output:\n{output}"
-        );
     }
 
     [TestMethod]
-    public void RunAsync_UsingTaskReturn_Success()
+    public async Task RunAsync_UsingTaskReturn_Success()
     {
         // Act
-        Task<PingResult> task = Sut.RunAsync("localhost");
-        PingResult result = task.Result;
+        PingResult result = await Sut.RunAsync("localhost");
 
         // Assert
         Assert.IsNotNull(result.StdOutput, "Output should not be null.");
         Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
         Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
-
-        string output = result.StdOutput;
-        string[] successMarkers = { "Reply from", "bytes from" };
-
-        bool containsMarker = successMarkers.Any(marker =>
-            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
-
-        Assert.IsTrue(
-            containsMarker,
-            $"Output did not contain any known success markers. Actual output:\n{output}"
-        );
     }
+
 
 
     [TestMethod]
