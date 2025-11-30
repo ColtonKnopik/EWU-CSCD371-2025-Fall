@@ -23,10 +23,19 @@ public class PingProcessTests
     [TestMethod]
     public void Start_PingProcess_Success()
     {
-        Process process = Process.Start("ping", "localhost");
+        ProcessStartInfo psi;
+
+        if (OperatingSystem.IsWindows())
+            psi = new ProcessStartInfo("ping", "localhost -n 1");
+        else
+            psi = new ProcessStartInfo("ping", "localhost -c 1");
+
+        using Process process = Process.Start(psi)!;
         process.WaitForExit();
-        Assert.AreEqual<int>(0, process.ExitCode);
+
+        Assert.AreEqual(0, process.ExitCode);
     }
+
 
     [TestMethod]
     public void Run_GoogleDotCom_Success()

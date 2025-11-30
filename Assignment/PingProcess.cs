@@ -33,7 +33,6 @@ public class PingProcess
         }
     }
 
-
     private ProcessStartInfo StartInfo { get; } = new("ping");
 
     public PingResult Run(string hostNameOrAddress)
