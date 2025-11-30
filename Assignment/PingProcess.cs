@@ -16,19 +16,23 @@ public class PingProcess
     private void SetPingArguments(string host)
     {
         StartInfo.ArgumentList.Clear();
-        StartInfo.ArgumentList.Add(host);
 
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
+            // On Linux/macOS: ping -c 1 <host>
             StartInfo.ArgumentList.Add("-c");
             StartInfo.ArgumentList.Add("1");
+            StartInfo.ArgumentList.Add(host);
         }
-        else // Windows
+        else
         {
+            // On Windows: ping -n 1 <host>
             StartInfo.ArgumentList.Add("-n");
             StartInfo.ArgumentList.Add("1");
+            StartInfo.ArgumentList.Add(host);
         }
     }
+
 
     private ProcessStartInfo StartInfo { get; } = new("ping");
 
