@@ -44,26 +44,34 @@ public class PingProcess
         return await task;
     }
 
-// Dont forget to fix this warning
+    // Dont forget to fix this warning
 #pragma warning disable CA1822
-    async public Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
+    public async Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
     {
-        StringBuilder? stringBuilder = null;
-        ParallelQuery<Task<int>>? all = hostNameOrAddresses.AsParallel().Select(async item =>
-        {
-            Task<PingResult> task = null!;
-            // ...
+        if (hostNameOrAddresses == null || hostNameOrAddresses.Length == 0)
+            throw new ArgumentException("At least one host must be provided.");
 
-            await task.WaitAsync(default(CancellationToken));
-            return task.Result.ExitCode;
-        });
+        var outputs = new StringBuilder();
 
-        await Task.WhenAll(all);
-        int total = all.Aggregate(0, (total, item) => total + item.Result);
-        return new PingResult(total, stringBuilder?.ToString());
+        var tasks = hostNameOrAddresses
+            .Select(async host =>
+            {
+                var result = await RunAsync(host);
+                if (!string.IsNullOrWhiteSpace(result.StdOutput))
+                    outputs.AppendLine(result.StdOutput);
+
+                return result.ExitCode;
+            })
+            .ToList();
+
+        int[] exitCodes = await Task.WhenAll(tasks);
+        int total = exitCodes.Sum();
+
+        return new PingResult(total, outputs.ToString());
     }
-#pragma warning restore CA1822
 
+
+#pragma warning restore CA1822
     async public Task<PingResult> RunLongRunningAsync(
         string hostNameOrAddress, CancellationToken cancellationToken = default)
     {

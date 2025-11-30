@@ -72,16 +72,22 @@ public class PingProcessTests
     }
 
     [TestMethod]
-#pragma warning disable CS1998 // Remove this
-    async public Task RunAsync_UsingTpl_Success()
+    public async Task RunAsync_UsingTpl_Success()
     {
-        // DO use async/await in this test.
-        PingResult result = default;
+        // Arrange
+        var sut = new PingProcess();
 
-        // Test Sut.RunAsync("localhost");
-        AssertValidPingOutput(result);
+        // Act
+        PingResult result = await sut.RunAsync("localhost");
+
+        // Assert
+        Assert.AreEqual(0, result.ExitCode, "Ping to localhost should succeed.");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput), "StdOutput should contain ping output.");
+        Assert.IsTrue(result.StdOutput!.Contains("Reply")
+                   || result.StdOutput.Contains("bytes"),
+                   "Expected ping output to contain response text.");
     }
-#pragma warning restore CS1998 // Remove this
+
 
 
     [TestMethod]
@@ -101,35 +107,64 @@ public class PingProcessTests
     }
 
     [TestMethod]
-    async public Task RunAsync_MultipleHostAddresses_True()
+    public async Task RunAsync_MultipleHostAddresses_True()
     {
-        // Pseudo Code - don't trust it!!!
-        string[] hostNames = new string[] { "localhost", "localhost", "localhost", "localhost" };
-        int expectedLineCount = PingOutputLikeExpression.Split(Environment.NewLine).Length * hostNames.Length;
-        PingResult result = await Sut.RunAsync(hostNames);
-        int? lineCount = result.StdOutput?.Split(Environment.NewLine).Length;
-        Assert.AreEqual(expectedLineCount, lineCount);
+        // Arrange
+        var sut = new PingProcess();
+        string[] hosts = { "localhost", "127.0.0.1" };
+
+        // Act
+        PingResult result = await sut.RunAsync(hosts);
+
+        // Assert
+        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+
+        // ExitCode must be aggregated, but every successful ping returns 0
+        Assert.AreEqual(0, result.ExitCode, "Ping should succeed for all hosts.");
+
+        // Normalize output once
+        var output = result.StdOutput;
+
+        // Windows success pattern: "Reply from"
+        bool windows = output.Contains("Reply from", StringComparison.OrdinalIgnoreCase);
+
+        // Linux/macOS success pattern: "bytes from"
+        bool linux = output.Contains("bytes from", StringComparison.OrdinalIgnoreCase);
+
+        Assert.IsTrue(
+            windows || linux,
+            $"Output did not contain any known success markers. Actual output:\n{output}"
+        );
     }
 
+
+
     [TestMethod]
-#pragma warning disable CS1998 // Remove this
-    async public Task RunLongRunningAsync_UsingTpl_Success()
+    public async Task RunLongRunningAsync_UsingTpl_Success()
     {
-        PingResult result = default;
-        // Test Sut.RunLongRunningAsync("localhost");
+        var sut = new PingProcess();
+
+        PingResult result = await sut.RunLongRunningAsync("localhost");
+
         AssertValidPingOutput(result);
     }
-#pragma warning restore CS1998 // Remove this
+
 
     [TestMethod]
     public void StringBuilderAppendLine_InParallel_IsNotThreadSafe()
     {
+        // Arrange
         IEnumerable<int> numbers = Enumerable.Range(0, short.MaxValue);
         System.Text.StringBuilder stringBuilder = new();
-        numbers.AsParallel().ForAll(item => stringBuilder.AppendLine(""));
-        int lineCount = stringBuilder.ToString().Split(Environment.NewLine).Length;
-        Assert.AreNotEqual(lineCount, numbers.Count() + 1);
+
+        // Act + Assert
+        Assert.Throws<AggregateException>(() =>
+        {
+            numbers.AsParallel().ForAll(item => stringBuilder.AppendLine(""));
+        });
     }
+
 
     readonly string PingOutputLikeExpression = @"
 Pinging * with 32 bytes of data:
