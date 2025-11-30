@@ -13,11 +13,28 @@ public record struct PingResult(int ExitCode, string? StdOutput);
 
 public class PingProcess
 {
+    private void SetPingArguments(string host)
+    {
+        StartInfo.ArgumentList.Clear();
+        StartInfo.ArgumentList.Add(host);
+
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            StartInfo.ArgumentList.Add("-c");
+            StartInfo.ArgumentList.Add("1");
+        }
+        else // Windows
+        {
+            StartInfo.ArgumentList.Add("-n");
+            StartInfo.ArgumentList.Add("1");
+        }
+    }
+
     private ProcessStartInfo StartInfo { get; } = new("ping");
 
     public PingResult Run(string hostNameOrAddress)
     {
-        StartInfo.Arguments = hostNameOrAddress;
+        SetPingArguments(hostNameOrAddress);
         StringBuilder? stringBuilder = null;
         void updateStdOutput(string? line) =>
             (stringBuilder??=new StringBuilder()).AppendLine(line);
@@ -44,25 +61,30 @@ public class PingProcess
         return await task;
     }
 
-    // Dont forget to fix this warning
-#pragma warning disable CA1822
     public async Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
     {
         if (hostNameOrAddresses == null || hostNameOrAddresses.Length == 0)
             throw new ArgumentException("At least one host must be provided.");
 
         var outputs = new StringBuilder();
+        var lockObj = new object();
 
         var tasks = hostNameOrAddresses
             .Select(async host =>
             {
                 var result = await RunAsync(host);
                 if (!string.IsNullOrWhiteSpace(result.StdOutput))
-                    outputs.AppendLine(result.StdOutput);
+                {
+                    lock (lockObj)
+                    {
+                        outputs.AppendLine(result.StdOutput);
+                    }
+                }
 
                 return result.ExitCode;
             })
             .ToList();
+
 
         int[] exitCodes = await Task.WhenAll(tasks);
         int total = exitCodes.Sum();
@@ -70,8 +92,6 @@ public class PingProcess
         return new PingResult(total, outputs.ToString());
     }
 
-
-#pragma warning restore CA1822
     async public Task<PingResult> RunLongRunningAsync(
         string hostNameOrAddress, CancellationToken cancellationToken = default)
     {

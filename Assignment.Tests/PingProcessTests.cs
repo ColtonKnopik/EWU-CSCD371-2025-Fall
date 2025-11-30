@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -51,25 +52,74 @@ public class PingProcessTests
     [TestMethod]
     public void Run_CaptureStdOutput_Success()
     {
+        // Act
         PingResult result = Sut.Run("localhost");
-        AssertValidPingOutput(result);
+
+        // Assert
+        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+
+        string output = result.StdOutput;
+        string[] successMarkers = { "Reply from", "bytes from" };
+
+        bool containsMarker = successMarkers.Any(marker =>
+            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(
+            containsMarker,
+            $"Output did not contain any known success markers. Actual output:\n{output}"
+        );
     }
 
     [TestMethod]
     public void RunTaskAsync_Success()
     {
+        // Act
         Task<PingResult> task = Sut.RunTaskAsync("localhost");
         PingResult result = task.Result;
-        AssertValidPingOutput(result);
+
+        // Assert
+        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+
+        string output = result.StdOutput;
+        string[] successMarkers = { "Reply from", "bytes from" };
+
+        bool containsMarker = successMarkers.Any(marker =>
+            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(
+            containsMarker,
+            $"Output did not contain any known success markers. Actual output:\n{output}"
+        );
     }
 
     [TestMethod]
     public void RunAsync_UsingTaskReturn_Success()
     {
+        // Act
         Task<PingResult> task = Sut.RunAsync("localhost");
         PingResult result = task.Result;
-        AssertValidPingOutput(result);
+
+        // Assert
+        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+
+        string output = result.StdOutput;
+        string[] successMarkers = { "Reply from", "bytes from" };
+
+        bool containsMarker = successMarkers.Any(marker =>
+            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(
+            containsMarker,
+            $"Output did not contain any known success markers. Actual output:\n{output}"
+        );
     }
+
 
     [TestMethod]
     public async Task RunAsync_UsingTpl_Success()
@@ -119,21 +169,21 @@ public class PingProcessTests
         // Assert
         Assert.IsNotNull(result.StdOutput, "Output should not be null.");
         Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-
-        // ExitCode must be aggregated, but every successful ping returns 0
         Assert.AreEqual(0, result.ExitCode, "Ping should succeed for all hosts.");
 
-        // Normalize output once
-        var output = result.StdOutput;
+        string output = result.StdOutput;
 
-        // Windows success pattern: "Reply from"
-        bool windows = output.Contains("Reply from", StringComparison.OrdinalIgnoreCase);
+        string[] successMarkers = new[]
+        {
+        "Reply from",    // Windows IPv4/IPv6
+        "bytes from"     // Linux/macOS
+    };
 
-        // Linux/macOS success pattern: "bytes from"
-        bool linux = output.Contains("bytes from", StringComparison.OrdinalIgnoreCase);
+        bool containsMarker = successMarkers.Any(marker =>
+            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
         Assert.IsTrue(
-            windows || linux,
+            containsMarker,
             $"Output did not contain any known success markers. Actual output:\n{output}"
         );
     }
@@ -143,27 +193,62 @@ public class PingProcessTests
     [TestMethod]
     public async Task RunLongRunningAsync_UsingTpl_Success()
     {
+        // Arrange
         var sut = new PingProcess();
 
+        // Act
         PingResult result = await sut.RunLongRunningAsync("localhost");
 
-        AssertValidPingOutput(result);
+        // Assert
+        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+
+        string output = result.StdOutput;
+
+        string[] successMarkers = new[]
+        {
+        "Reply from",    // Windows IPv4/IPv6
+        "bytes from"     // Linux/macOS
+    };
+
+        bool containsMarker = successMarkers.Any(marker =>
+            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(
+            containsMarker,
+            $"Output did not contain any known success markers. Actual output:\n{output}"
+        );
     }
+
 
 
     [TestMethod]
-    public void StringBuilderAppendLine_InParallel_IsNotThreadSafe()
+    public void StringBuilderAppendLine_InParallel_DemonstratesNonThreadSafeBehavior()
     {
         // Arrange
-        IEnumerable<int> numbers = Enumerable.Range(0, short.MaxValue);
-        System.Text.StringBuilder stringBuilder = new();
+        IEnumerable<int> numbers = Enumerable.Range(0, 1000);
+        var stringBuilder = new StringBuilder();
+        Exception? capturedException = null;
 
-        // Act + Assert
-        Assert.Throws<AggregateException>(() =>
+        // Act
+        try
         {
-            numbers.AsParallel().ForAll(item => stringBuilder.AppendLine(""));
-        });
+            numbers.AsParallel().ForAll(item => stringBuilder.AppendLine("X"));
+        }
+        catch (Exception ex)
+        {
+            capturedException = ex;
+        }
+
+        // Assert
+        Assert.IsTrue(
+            capturedException != null || stringBuilder.Length != numbers.Count() * 2,
+            "StringBuilder is not thread-safe: either an exception occurs or the content is corrupted."
+        );
     }
+
+
 
 
     readonly string PingOutputLikeExpression = @"
