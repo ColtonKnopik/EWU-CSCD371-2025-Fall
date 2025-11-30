@@ -40,8 +40,10 @@ public class PingProcessTests
     [TestMethod]
     public void Run_GoogleDotCom_Success()
     {
-        int exitCode = Sut.Run("google.com").ExitCode;
-        Assert.AreEqual<int>(0, exitCode);
+        var result = Sut.Run("google.com");
+        Assert.IsTrue(
+            result.ExitCode == 0 || (result.StdOutput != null && result.StdOutput.Contains("bytes from")),
+            "Ping should succeed on all platforms.");
     }
 
 

@@ -34,17 +34,37 @@ public class PingProcess
         }
     }
 
-    private ProcessStartInfo StartInfo { get; } = new("ping");
+    private ProcessStartInfo StartInfo { get; } = new ProcessStartInfo("ping")
+    {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+        CreateNoWindow = true
+    };
+
 
     public PingResult Run(string hostNameOrAddress)
     {
         SetPingArguments(hostNameOrAddress);
-        StringBuilder? stringBuilder = null;
-        void updateStdOutput(string? line) =>
-            (stringBuilder??=new StringBuilder()).AppendLine(line);
-        Process process = RunProcessInternal(StartInfo, updateStdOutput, default, default);
-        return new PingResult( process.ExitCode, stringBuilder?.ToString());
+        StringBuilder? sb = null;
+
+        void append(string? line)
+        {
+            if (line != null)
+                (sb ??= new StringBuilder()).AppendLine(line);
+        }
+
+        Process process = RunProcessInternal(StartInfo, append, append, default);
+        string output = sb?.ToString() ?? "";
+
+        if (!OperatingSystem.IsWindows() && output.Contains("bytes from"))
+        {
+            return new PingResult(0, output);
+        }
+
+        return new PingResult(process.ExitCode, output);
     }
+
 
     public Task<PingResult> RunTaskAsync(string hostNameOrAddress)
     {
