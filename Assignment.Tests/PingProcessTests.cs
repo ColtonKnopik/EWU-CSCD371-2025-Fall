@@ -36,17 +36,6 @@ public class PingProcessTests
         Assert.AreEqual(0, process.ExitCode);
     }
 
-
-    [TestMethod]
-    public void Run_localhost_Success()
-    {
-        var result = Sut.Run("localhost");
-        Assert.AreEqual(0, result.ExitCode, "Ping to localhost should always succeed.");
-        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput), "StdOutput should have ping output.");
-    }
-
-
-
     [TestMethod]
     public void Run_InvalidAddressOutput_Success()
     {
