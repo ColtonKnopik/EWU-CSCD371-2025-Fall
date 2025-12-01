@@ -40,6 +40,7 @@ public class PingProcess
     /// <summary>
     /// Synchronous ping. Safe: no live Process is returned.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
     public PingResult Run(string hostNameOrAddress)
     {
         var psi = CreatePingStartInfo(hostNameOrAddress);
@@ -59,6 +60,7 @@ public class PingProcess
     public Task<PingResult> RunTaskAsync(string hostNameOrAddress)
         => Task.Run(() => Run(hostNameOrAddress));
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
     public Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken token = default)
         => ExecuteProcessAsync(CreatePingStartInfo(hostNameOrAddress), null, null, token);
 
@@ -86,6 +88,7 @@ public class PingProcess
         return new PingResult(exitCodes.Sum(), outputs.ToString());
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
     public Task<PingResult> RunLongRunningAsync(string host, CancellationToken token = default)
     {
         return Task.Factory.StartNew(
