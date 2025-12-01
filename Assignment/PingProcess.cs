@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -12,15 +11,7 @@ public record struct PingResult(int ExitCode, string? StdOutput);
 
 public class PingProcess
 {
-    private ProcessStartInfo StartInfo { get; } = new ProcessStartInfo("ping")
-    {
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        UseShellExecute = false,
-        CreateNoWindow = true
-    };
-
-    private ProcessStartInfo CreatePingStartInfo(string host)
+    private static ProcessStartInfo CreatePingStartInfo(string host)
     {
         var psi = new ProcessStartInfo("ping")
         {
@@ -123,7 +114,7 @@ public class PingProcess
     /// Executes a process safely and returns exit code + output.
     /// Handles cancellation and disposes Process internally.
     /// </summary>
-    private async Task<PingResult> ExecuteProcessAsync(
+    private static async Task<PingResult> ExecuteProcessAsync(
         ProcessStartInfo startInfo,
         Action<string?>? progressOutput,
         Action<string?>? progressError,
