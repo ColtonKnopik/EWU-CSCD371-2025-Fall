@@ -27,9 +27,9 @@ public class PingProcessTests
         ProcessStartInfo psi;
 
         if (OperatingSystem.IsWindows())
-            psi = new ProcessStartInfo("ping", "localhost -n 1");
+            psi = new ProcessStartInfo("ping", "127.0.0.1 -n 1");
         else
-            psi = new ProcessStartInfo("ping", "localhost -c 1");
+            psi = new ProcessStartInfo("ping", "127.0.0.1 -c 1");
 
         using Process process = Process.Start(psi)!;
         process.WaitForExit();
