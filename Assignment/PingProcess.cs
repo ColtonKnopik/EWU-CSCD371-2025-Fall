@@ -244,26 +244,33 @@ public class PingProcess
         }
         finally
         {
-            // dispose the registration to unregister the callback
             try { registration.Dispose(); } catch { }
+
+            // Stop async readers FIRST.
+            if (process.StartInfo.RedirectStandardOutput)
+            {
+                try { process.CancelOutputRead(); } catch { }
+            }
 
             if (process.StartInfo.RedirectStandardError)
             {
-                process.CancelErrorRead();
+                try { process.CancelErrorRead(); } catch { }
             }
-            if (process.StartInfo.RedirectStandardOutput)
-            {
-                process.CancelOutputRead();
-            }
+
+            // Remove handlers BEFORE kill/dispose
             process.OutputDataReceived -= OutputHandler;
             process.ErrorDataReceived -= ErrorHandler;
 
+            // Only kill if STILL running
             if (!process.HasExited)
             {
-                try { process.Kill(); } catch { }
+                try { process.Kill(entireProcessTree: true); } catch { }
             }
 
+            // Dispose LAST
+            try { process.Dispose(); } catch { }
         }
+
         return process;
 
         void OutputHandler(object s, DataReceivedEventArgs e)
