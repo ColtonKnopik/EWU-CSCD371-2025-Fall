@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -13,27 +12,6 @@ public record struct PingResult(int ExitCode, string? StdOutput);
 
 public class PingProcess
 {
-    private void SetPingArguments(string host)
-    {
-        StartInfo.Arguments = string.Empty;
-        StartInfo.ArgumentList.Clear();
-
-        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
-        {
-            // On Linux/macOS: ping -c 1 <host>
-            StartInfo.ArgumentList.Add("-c");
-            StartInfo.ArgumentList.Add("1");
-            StartInfo.ArgumentList.Add(host);
-        }
-        else
-        {
-            // On Windows: ping -n 1 <host>
-            StartInfo.ArgumentList.Add("-n");
-            StartInfo.ArgumentList.Add("1");
-            StartInfo.ArgumentList.Add(host);
-        }
-    }
-
     private ProcessStartInfo StartInfo { get; } = new ProcessStartInfo("ping")
     {
         RedirectStandardOutput = true,
@@ -42,49 +20,56 @@ public class PingProcess
         CreateNoWindow = true
     };
 
+    private ProcessStartInfo CreatePingStartInfo(string host)
+    {
+        var psi = new ProcessStartInfo("ping")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
 
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add(host);
+        }
+        else
+        {
+            psi.ArgumentList.Add("-n");
+            psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add(host);
+        }
+
+        return psi;
+    }
+
+    /// <summary>
+    /// Synchronous ping. Safe: no live Process is returned.
+    /// </summary>
     public PingResult Run(string hostNameOrAddress)
     {
-        SetPingArguments(hostNameOrAddress);
-        StringBuilder? sb = null;
+        var psi = CreatePingStartInfo(hostNameOrAddress);
 
-        void append(string? line)
+        var result = ExecuteProcessAsync(psi, null, null, CancellationToken.None)
+            .GetAwaiter().GetResult();
+
+        if (!OperatingSystem.IsWindows() &&
+            result.StdOutput?.Contains("bytes from", StringComparison.OrdinalIgnoreCase) == true)
         {
-            if (line != null)
-                (sb ??= new StringBuilder()).AppendLine(line);
+            return new PingResult(0, result.StdOutput);
         }
 
-        // ensure the Process is disposed when we're done reading ExitCode
-        using var process = RunProcessInternal(StartInfo, append, append, default);
-        string output = sb?.ToString() ?? "";
-
-        if (!OperatingSystem.IsWindows() && output.Contains("bytes from"))
-        {
-            return new PingResult(0, output);
-        }
-
-        return new PingResult(process.ExitCode, output);
+        return new PingResult(result.ExitCode, result.StdOutput);
     }
-
 
     public Task<PingResult> RunTaskAsync(string hostNameOrAddress)
-    {
-        return Task.Run(() => this.Run(hostNameOrAddress));
-    }
+        => Task.Run(() => Run(hostNameOrAddress));
 
-    async public Task<PingResult> RunAsync(
-        string hostNameOrAddress, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var task = Task.Run(() =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return this.Run(hostNameOrAddress);
-        }, cancellationToken);
-
-        return await task;
-    }
+    public Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken token = default)
+        => ExecuteProcessAsync(CreatePingStartInfo(hostNameOrAddress), null, null, token);
 
     public async Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
     {
@@ -101,187 +86,94 @@ public class PingProcess
                 if (!string.IsNullOrWhiteSpace(result.StdOutput))
                 {
                     lock (lockObj)
-                    {
                         outputs.AppendLine(result.StdOutput);
-                    }
                 }
-
                 return result.ExitCode;
-            })
-            .ToList();
-
+            });
 
         int[] exitCodes = await Task.WhenAll(tasks);
-        int total = exitCodes.Sum();
-
-        return new PingResult(total, outputs.ToString());
+        return new PingResult(exitCodes.Sum(), outputs.ToString());
     }
 
-    async public Task<PingResult> RunLongRunningAsync(
-        string hostNameOrAddress, CancellationToken cancellationToken = default)
+    public Task<PingResult> RunLongRunningAsync(string host, CancellationToken token = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var task = Task.Factory.StartNew(() =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return this.Run(hostNameOrAddress);
-        }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Current);
-
-        return await task;
+        return Task.Factory.StartNew(
+            () => Run(host),
+            token,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
     }
 
-    // 5
     public Task<int> RunLongRunningAsync(
-    ProcessStartInfo startInfo,
-    Action<string?>? progressOutput,
-    Action<string?>? progressError,
-    CancellationToken token)
-    {
-        return Task.Factory.StartNew(() =>
-        {
-            token.ThrowIfCancellationRequested();
-
-            var process = new Process
-            {
-                StartInfo = UpdateProcessStartInfo(startInfo)
-            };
-
-            var resultProcess = RunProcessInternal(
-                process,
-                progressOutput,
-                progressError,
-                token);
-
-            // ensure the process is disposed after we read the exit code
-            int exitCode = resultProcess.ExitCode;
-            try
-            {
-                resultProcess.Dispose();
-            }
-            catch
-            {
-                // ignore disposal failures; we already captured exit code
-            }
-
-            return exitCode;
-
-        }, token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
-    }
-
-
-    private Process RunProcessInternal(
         ProcessStartInfo startInfo,
         Action<string?>? progressOutput,
         Action<string?>? progressError,
         CancellationToken token)
     {
-        var process = new Process
+        return Task.Factory.StartNew(() =>
         {
-            StartInfo = UpdateProcessStartInfo(startInfo)
-        };
-        return RunProcessInternal(process, progressOutput, progressError, token);
+            token.ThrowIfCancellationRequested();
+            var result = ExecuteProcessAsync(startInfo, progressOutput, progressError, token)
+                .GetAwaiter().GetResult();
+            return result.ExitCode;
+        }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
-    private Process RunProcessInternal(
-        Process process,
+    /// <summary>
+    /// Executes a process safely and returns exit code + output.
+    /// Handles cancellation and disposes Process internally.
+    /// </summary>
+    private async Task<PingResult> ExecuteProcessAsync(
+        ProcessStartInfo startInfo,
         Action<string?>? progressOutput,
         Action<string?>? progressError,
         CancellationToken token)
     {
-        // capture the registration so we can dispose it and avoid leaked callbacks
-        CancellationTokenRegistration registration = default;
+        using var process = new Process { StartInfo = UpdateProcessStartInfo(startInfo), EnableRaisingEvents = true };
+        var outputBuilder = new StringBuilder();
 
-        process.EnableRaisingEvents = true;
-        process.OutputDataReceived += OutputHandler;
-        process.ErrorDataReceived += ErrorHandler;
-
-        try
+        void AppendOutput(string? line)
         {
-            if (!process.Start())
+            if (line != null)
             {
-                return process;
+                outputBuilder.AppendLine(line);
+                progressOutput?.Invoke(line);
             }
-
-            // register cancellation callback and keep the registration so we can dispose it
-            registration = token.Register(obj =>
-            {
-                if (obj is Process p && !p.HasExited)
-                {
-                    try
-                    {
-                        p.Kill();
-                    }
-                    catch (Win32Exception)
-                    {
-                        // do not throw from a threadpool callback; just surface via InvalidOperationException on the calling thread if needed
-                        // swallow here to avoid unobserved exceptions in the thread pool
-                        
-                    }
-                }
-            }, process);
-
-
-            if (process.StartInfo.RedirectStandardOutput)
-            {
-                process.BeginOutputReadLine();
-            }
-            if (process.StartInfo.RedirectStandardError)
-            {
-                process.BeginErrorReadLine();
-            }
-
-            if (process.HasExited)
-            {
-                return process;
-            }
-            process.WaitForExit(); 
-
-        }
-        catch (Exception e)
-        {
-            throw new InvalidOperationException($"Error running '{process.StartInfo.FileName} {process.StartInfo.Arguments}'{Environment.NewLine}{e}");
-        }
-        finally
-        {
-            try { registration.Dispose(); } catch { }
-
-            // Stop async readers FIRST.
-            if (process.StartInfo.RedirectStandardOutput)
-            {
-                try { process.CancelOutputRead(); } catch { }
-            }
-
-            if (process.StartInfo.RedirectStandardError)
-            {
-                try { process.CancelErrorRead(); } catch { }
-            }
-
-            // Remove handlers BEFORE kill/dispose
-            process.OutputDataReceived -= OutputHandler;
-            process.ErrorDataReceived -= ErrorHandler;
-
-            // Only kill if STILL running
-            if (!process.HasExited)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { }
-            }
-
-            // Dispose LAST
-            try { process.Dispose(); } catch { }
         }
 
-        return process;
-
-        void OutputHandler(object s, DataReceivedEventArgs e)
+        void AppendError(string? line)
         {
-            progressOutput?.Invoke(e.Data);
+            if (line != null)
+                progressError?.Invoke(line);
         }
 
-        void ErrorHandler(object s, DataReceivedEventArgs e)
+        using var registration = token.Register(() =>
         {
-            progressError?.Invoke(e.Data);
-        }
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // swallow exceptions during cancellation
+            }
+        });
+
+        process.OutputDataReceived += (s, e) => AppendOutput(e.Data);
+        process.ErrorDataReceived += (s, e) => AppendError(e.Data);
+
+        if (!process.Start())
+            throw new InvalidOperationException("Failed to start ping process.");
+
+        if (process.StartInfo.RedirectStandardOutput)
+            process.BeginOutputReadLine();
+        if (process.StartInfo.RedirectStandardError)
+            process.BeginErrorReadLine();
+
+        await process.WaitForExitAsync(token);
+
+        return new PingResult(process.ExitCode, outputBuilder.ToString());
     }
 
     private static ProcessStartInfo UpdateProcessStartInfo(ProcessStartInfo startInfo)
@@ -291,7 +183,6 @@ public class PingProcess
         startInfo.RedirectStandardOutput = true;
         startInfo.UseShellExecute = false;
         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
         return startInfo;
     }
 }
