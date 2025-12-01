@@ -54,7 +54,8 @@ public class PingProcess
                 (sb ??= new StringBuilder()).AppendLine(line);
         }
 
-        Process process = RunProcessInternal(StartInfo, append, append, default);
+        // ensure the Process is disposed when we're done reading ExitCode
+        using var process = RunProcessInternal(StartInfo, append, append, default);
         string output = sb?.ToString() ?? "";
 
         if (!OperatingSystem.IsWindows() && output.Contains("bytes from"))
@@ -152,7 +153,18 @@ public class PingProcess
                 progressError,
                 token);
 
-            return resultProcess.ExitCode;
+            // ensure the process is disposed after we read the exit code
+            int exitCode = resultProcess.ExitCode;
+            try
+            {
+                resultProcess.Dispose();
+            }
+            catch
+            {
+                // ignore disposal failures; we already captured exit code
+            }
+
+            return exitCode;
 
         }, token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
     }
@@ -177,6 +189,9 @@ public class PingProcess
         Action<string?>? progressError,
         CancellationToken token)
     {
+        // capture the registration so we can dispose it and avoid leaked callbacks
+        CancellationTokenRegistration registration = default;
+
         process.EnableRaisingEvents = true;
         process.OutputDataReceived += OutputHandler;
         process.ErrorDataReceived += ErrorHandler;
@@ -188,7 +203,8 @@ public class PingProcess
                 return process;
             }
 
-            token.Register(obj =>
+            // register cancellation callback and keep the registration so we can dispose it
+            registration = token.Register(obj =>
             {
                 if (obj is Process p && !p.HasExited)
                 {
@@ -196,9 +212,11 @@ public class PingProcess
                     {
                         p.Kill();
                     }
-                    catch (Win32Exception ex)
+                    catch (Win32Exception)
                     {
-                        throw new InvalidOperationException($"Error cancelling process{Environment.NewLine}{ex}");
+                        // do not throw from a threadpool callback; just surface via InvalidOperationException on the calling thread if needed
+                        // swallow here to avoid unobserved exceptions in the thread pool
+                        
                     }
                 }
             }, process);
@@ -226,6 +244,9 @@ public class PingProcess
         }
         finally
         {
+            // dispose the registration to unregister the callback
+            try { registration.Dispose(); } catch { }
+
             if (process.StartInfo.RedirectStandardError)
             {
                 process.CancelErrorRead();
@@ -239,7 +260,7 @@ public class PingProcess
 
             if (!process.HasExited)
             {
-                process.Kill();
+                try { process.Kill(); } catch { }
             }
 
         }
