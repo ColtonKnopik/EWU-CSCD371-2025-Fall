@@ -98,6 +98,7 @@ public class PingProcess
             TaskScheduler.Default);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
     public Task<int> RunLongRunningAsync(
         ProcessStartInfo startInfo,
         Action<string?>? progressOutput,
