@@ -37,73 +37,50 @@ public class PingProcess
         return psi;
     }
 
-    /// <summary>
-    /// Synchronous ping. Safe: no live Process is returned.
-    /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
-    public PingResult Run(string hostNameOrAddress)
+    public PingResult Run(string host)
     {
-        var psi = CreatePingStartInfo(hostNameOrAddress);
-
-        var result = ExecuteProcessAsync(psi, null, null, CancellationToken.None)
+        var result = ExecuteProcessAsync(CreatePingStartInfo(host), null, null, CancellationToken.None)
             .GetAwaiter().GetResult();
 
-        if (!OperatingSystem.IsWindows() &&
-            result.StdOutput?.Contains("bytes from", StringComparison.OrdinalIgnoreCase) == true)
-        {
+        // Treat Linux/macOS "bytes from" output as success
+        if (!OperatingSystem.IsWindows() && result.StdOutput?.Contains("bytes from", StringComparison.OrdinalIgnoreCase) == true)
             return new PingResult(0, result.StdOutput);
-        }
 
-        return new PingResult(result.ExitCode, result.StdOutput);
+        return result;
     }
 
-    public Task<PingResult> RunTaskAsync(string hostNameOrAddress)
-        => Task.Run(() => Run(hostNameOrAddress));
+    public Task<PingResult> RunTaskAsync(string host) => Task.Run(() => Run(host));
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
-    public Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken token = default)
-        => ExecuteProcessAsync(CreatePingStartInfo(hostNameOrAddress), null, null, token);
+    public Task<PingResult> RunAsync(string host, CancellationToken token = default)
+        => ExecuteProcessAsync(CreatePingStartInfo(host), null, null, token);
 
-    public async Task<PingResult> RunAsync(params string[] hostNameOrAddresses)
+    public async Task<PingResult> RunAsync(params string[] hosts)
     {
-        if (hostNameOrAddresses == null || hostNameOrAddresses.Length == 0)
+        if (hosts == null || hosts.Length == 0)
             throw new ArgumentException("At least one host must be provided.");
 
-        var outputs = new StringBuilder();
-        var lockObj = new object();
+        var outputBuilder = new StringBuilder();
+        object lockObj = new();
 
-        var tasks = hostNameOrAddresses
-            .Select(async host =>
+        var tasks = hosts.Select(async host =>
+        {
+            var result = await RunAsync(host);
+            if (!string.IsNullOrWhiteSpace(result.StdOutput))
             {
-                var result = await RunAsync(host);
-                if (!string.IsNullOrWhiteSpace(result.StdOutput))
-                {
-                    lock (lockObj)
-                        outputs.AppendLine(result.StdOutput);
-                }
-                return result.ExitCode;
-            });
+                lock (lockObj)
+                    outputBuilder.AppendLine(result.StdOutput);
+            }
+            return result.ExitCode;
+        });
 
         int[] exitCodes = await Task.WhenAll(tasks);
-        return new PingResult(exitCodes.Sum(), outputs.ToString());
+        return new PingResult(exitCodes.Sum(), outputBuilder.ToString());
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
     public Task<PingResult> RunLongRunningAsync(string host, CancellationToken token = default)
-    {
-        return Task.Factory.StartNew(
-            () => Run(host),
-            token,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
-    }
+        => Task.Factory.StartNew(() => Run(host), token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as instance API for test usage and future extensibility.")]
-    public Task<int> RunLongRunningAsync(
-        ProcessStartInfo startInfo,
-        Action<string?>? progressOutput,
-        Action<string?>? progressError,
-        CancellationToken token)
+    public Task<int> RunLongRunningAsync(ProcessStartInfo startInfo, Action<string?>? progressOutput, Action<string?>? progressError, CancellationToken token)
     {
         return Task.Factory.StartNew(() =>
         {
@@ -114,15 +91,7 @@ public class PingProcess
         }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
-    /// <summary>
-    /// Executes a process safely and returns exit code + output.
-    /// Handles cancellation and disposes Process internally.
-    /// </summary>
-    private static async Task<PingResult> ExecuteProcessAsync(
-        ProcessStartInfo startInfo,
-        Action<string?>? progressOutput,
-        Action<string?>? progressError,
-        CancellationToken token)
+    private static async Task<PingResult> ExecuteProcessAsync(ProcessStartInfo startInfo, Action<string?>? progressOutput, Action<string?>? progressError, CancellationToken token)
     {
         using var process = new Process { StartInfo = UpdateProcessStartInfo(startInfo), EnableRaisingEvents = true };
         var outputBuilder = new StringBuilder();
@@ -149,10 +118,7 @@ public class PingProcess
                 if (!process.HasExited)
                     process.Kill(entireProcessTree: true);
             }
-            catch
-            {
-                // swallow exceptions during cancellation
-            }
+            catch { /* swallow exceptions */ }
         });
 
         process.OutputDataReceived += (s, e) => AppendOutput(e.Data);
