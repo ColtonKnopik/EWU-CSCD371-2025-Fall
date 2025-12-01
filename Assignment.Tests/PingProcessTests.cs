@@ -1,6 +1,5 @@
 ﻿using IntelliTect.TestTools;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -13,12 +12,12 @@ namespace Assignment.Tests;
 [DoNotParallelize]
 public class PingProcessTests
 {
-    PingProcess Sut { get; set; } = new();
+    private PingProcess Sut { get; set; } = new();
 
     [TestInitialize]
     public void TestInitialize()
     {
-        Sut = new();
+        Sut = new PingProcess();
     }
 
     [TestMethod]
@@ -40,191 +39,106 @@ public class PingProcessTests
     [TestMethod]
     public void Run_InvalidAddressOutput_Success()
     {
-        var (exitCode, stdOutput) = Sut.Run("badaddress");
+        var result = Sut.Run("badaddress");
 
-        Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
+        // Ensure output contains something, even if ping fails
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput));
 
-        string normalized = stdOutput!.Trim().ToLowerInvariant();
+        string normalized = result.StdOutput!.Trim().ToLowerInvariant();
 
         bool matches = normalized.Contains("temporary failure")
                     || normalized.Contains("name or service not known")
                     || normalized.Contains("could not find host");
 
-        Assert.IsTrue(matches, $"Unexpected output: {stdOutput}");
-        Assert.AreNotEqual(0, exitCode, "Exit code should indicate failure.");
+        Assert.IsTrue(matches, $"Unexpected output: {result.StdOutput}");
+        Assert.AreNotEqual(0, result.ExitCode, "Exit code should indicate failure.");
     }
-
 
     [TestMethod]
     public void Run_CaptureStdOutput_Success()
     {
-        // Act
-        PingResult result = Sut.Run("localhost");
+        var result = Sut.Run("localhost");
 
-        // Assert
-        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
+        Assert.IsNotNull(result.StdOutput);
         Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+        Assert.AreEqual(0, result.ExitCode);
 
-        string output = result.StdOutput;
         string[] successMarkers = { "Reply from", "bytes from" };
-
         bool containsMarker = successMarkers.Any(marker =>
-            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+            result.StdOutput.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
-        Assert.IsTrue(
-            containsMarker,
-            $"Output did not contain any known success markers. Actual output:\n{output}"
-        );
+        Assert.IsTrue(containsMarker, $"Output did not contain expected markers. Actual output:\n{result.StdOutput}");
     }
 
     [TestMethod]
     public async Task RunTaskAsync_Success()
     {
-        // Act
-        PingResult result = await Sut.RunTaskAsync("localhost");
+        var result = await Sut.RunTaskAsync("localhost");
 
-        // Assert
-        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
-        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
+        Assert.IsNotNull(result.StdOutput);
+        Assert.IsGreaterThan(0, result.StdOutput!.Length);
+        Assert.AreEqual(0, result.ExitCode);
     }
 
     [TestMethod]
     public async Task RunAsync_UsingTaskReturn_Success()
     {
-        // Act
-        PingResult result = await Sut.RunAsync("localhost");
+        var result = await Sut.RunAsync("localhost");
 
-        // Assert
-        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
-        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
-    }
-
-
-
-    [TestMethod]
-    public async Task RunAsync_UsingTpl_Success()
-    {
-        // Arrange
-        var sut = new PingProcess();
-
-        // Act
-        PingResult result = await sut.RunAsync("localhost");
-
-        // Assert
-        Assert.AreEqual(0, result.ExitCode, "Ping to localhost should succeed.");
-        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput), "StdOutput should contain ping output.");
-        Assert.IsTrue(result.StdOutput!.Contains("Reply")
-                   || result.StdOutput.Contains("bytes"),
-                   "Expected ping output to contain response text.");
-    }
-
-
-
-    [TestMethod]
-    // Commented out because I kept getting build errors due to this
-    //[ExpectedException(typeof(AggregateException))]
-    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrapping()
-    {
-
-    }
-
-    [TestMethod]
-    // Commented out because I kept getting build errors due to this
-    //[ExpectedException(typeof(TaskCanceledException))]
-    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrappingTaskCanceledException()
-    {
-        // Use exception.Flatten()
+        Assert.IsNotNull(result.StdOutput);
+        Assert.IsGreaterThan(0, result.StdOutput!.Length);
+        Assert.AreEqual(0, result.ExitCode);
     }
 
     [TestMethod]
     public async Task RunAsync_MultipleHostAddresses_True()
     {
-        // Arrange
-        var sut = new PingProcess();
         string[] hosts = { "localhost", "127.0.0.1" };
+        var result = await Sut.RunAsync(hosts);
 
-        // Act
-        PingResult result = await sut.RunAsync(hosts);
+        Assert.IsNotNull(result.StdOutput);
+        Assert.IsGreaterThan(0, result.StdOutput!.Length);
+        Assert.AreEqual(0, result.ExitCode);
 
-        // Assert
-        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
-        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-        Assert.AreEqual(0, result.ExitCode, "Ping should succeed for all hosts.");
-
-        string output = result.StdOutput;
-
-        string[] successMarkers = new[]
-        {
-        "Reply from",    // Windows IPv4/IPv6
-        "bytes from"     // Linux/macOS
-    };
-
+        string[] successMarkers = { "Reply from", "bytes from" };
         bool containsMarker = successMarkers.Any(marker =>
-            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+            result.StdOutput.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
-        Assert.IsTrue(
-            containsMarker,
-            $"Output did not contain any known success markers. Actual output:\n{output}"
-        );
+        Assert.IsTrue(containsMarker, $"Output did not contain expected markers. Actual output:\n{result.StdOutput}");
     }
-
-
 
     [TestMethod]
     public async Task RunLongRunningAsync_UsingTpl_Success()
     {
-        // Arrange
-        var sut = new PingProcess();
+        var result = await Sut.RunLongRunningAsync("localhost");
 
-        // Act
-        PingResult result = await sut.RunLongRunningAsync("localhost");
+        Assert.IsNotNull(result.StdOutput);
+        Assert.IsGreaterThan(0, result.StdOutput!.Length);
+        Assert.AreEqual(0, result.ExitCode);
 
-        // Assert
-        Assert.IsNotNull(result.StdOutput, "Output should not be null.");
-        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
-        Assert.AreEqual(0, result.ExitCode, "Ping should succeed.");
-
-        string output = result.StdOutput;
-
-        string[] successMarkers = new[]
-        {
-        "Reply from",    // Windows IPv4/IPv6
-        "bytes from"     // Linux/macOS
-    };
-
+        string[] successMarkers = { "Reply from", "bytes from" };
         bool containsMarker = successMarkers.Any(marker =>
-            output.Contains(marker, StringComparison.OrdinalIgnoreCase));
+            result.StdOutput.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
-        Assert.IsTrue(
-            containsMarker,
-            $"Output did not contain any known success markers. Actual output:\n{output}"
-        );
+        Assert.IsTrue(containsMarker, $"Output did not contain expected markers. Actual output:\n{result.StdOutput}");
     }
-
-
 
     [TestMethod]
     public void StringBuilderAppendLine_InParallel_DemonstratesNonThreadSafeBehavior()
     {
-        // Arrange
-        IEnumerable<int> numbers = Enumerable.Range(0, 1000);
+        var numbers = Enumerable.Range(0, 1000);
         var stringBuilder = new StringBuilder();
         Exception? capturedException = null;
 
-        // Act
         try
         {
-            numbers.AsParallel().ForAll(item => stringBuilder.AppendLine("X"));
+            numbers.AsParallel().ForAll(i => stringBuilder.AppendLine("X"));
         }
         catch (Exception ex)
         {
             capturedException = ex;
         }
 
-        // Assert
         Assert.IsTrue(
             capturedException != null || stringBuilder.Length != numbers.Count() * 2,
             "StringBuilder is not thread-safe: either an exception occurs or the content is corrupted."
@@ -234,56 +148,44 @@ public class PingProcessTests
     [TestMethod]
     public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
     {
-        // Arrange
-        var ping = new PingProcess();
         var psi = new ProcessStartInfo("ping", "localhost");
 
-        // Act
-        int result = await ping.RunLongRunningAsync(
+        int result = await Sut.RunLongRunningAsync(
             psi,
             progressOutput: _ => { },
             progressError: _ => { },
             token: CancellationToken.None);
 
-        // Assert
         Assert.AreEqual(0, result);
     }
 
     [TestMethod]
     public async Task RunLongRunningAsync_OutputProduced_ProgressOutputInvoked()
     {
-        // Arrange
-        var ping = new PingProcess();
-        var psi = new ProcessStartInfo("ping", "localhost");
-
         int count = 0;
         void output(string? line)
         {
-            if (line != null)
-                count++;
+            if (line != null) count++;
         }
 
-        // Act
-        await ping.RunLongRunningAsync(
+        var psi = new ProcessStartInfo("ping", "localhost");
+
+        await Sut.RunLongRunningAsync(
             psi,
             progressOutput: output,
             progressError: _ => { },
             token: CancellationToken.None);
 
-        // Assert
         Assert.IsGreaterThan(0, count, "Expected progressOutput to be invoked at least once.");
     }
 
     [TestMethod]
     public void RunLongRunningAsync_Cancelled_ThrowsAggregateException()
     {
-        // Arrange
-        var ping = new PingProcess();
         var psi = new ProcessStartInfo("ping", "localhost");
         var cts = new CancellationTokenSource();
 
-        // Act
-        var task = ping.RunLongRunningAsync(
+        var task = Sut.RunLongRunningAsync(
             psi,
             progressOutput: _ => { },
             progressError: _ => { },
@@ -291,7 +193,6 @@ public class PingProcessTests
 
         cts.Cancel();
 
-        // Assert
         try
         {
             task.Wait();
