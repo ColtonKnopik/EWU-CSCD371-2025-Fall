@@ -119,6 +119,8 @@ public class PingProcess
         return new PingResult(total, combinedOutput);
     }
 
+    // suppress CA1822 because this overload is intentionally left as an instance API for now
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Preserve instance API for tests/future extensibility.")]
     async public Task<PingResult> RunLongRunningAsync(
         string hostNameOrAddress, CancellationToken cancellationToken = default)
     {
@@ -208,8 +210,9 @@ public class PingProcess
             }
             process.WaitForExit();
 
-            outputDone?.Wait();
-            errorDone?.Wait();
+            // forward cancellation token to these waits so analyzer CA2016 is satisfied
+            outputDone?.Wait(token);
+            errorDone?.Wait(token);
         }
         catch (Exception e)
         {
