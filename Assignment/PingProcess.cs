@@ -13,27 +13,28 @@ public record struct PingResult(int ExitCode, string? StdOutput);
 
 public class PingProcess
 {
-    private ProcessStartInfo StartInfo { get; } = new("ping");
-
-    public PingResult Run(string hostNameOrAddress)
+    public PingResult Run(string hostNameOrAddress, CancellationToken cancellationToken = default)
     {
-        StartInfo.Arguments = hostNameOrAddress;
+        ProcessStartInfo info = new("ping")
+        {
+            Arguments = hostNameOrAddress
+        };
+
         StringBuilder? stringBuilder = null;
         void updateStdOutput(string? line) =>
             (stringBuilder ??= new StringBuilder()).AppendLine(line);
-        Process process = RunProcessInternal(StartInfo, updateStdOutput, default, default);
-        return new PingResult(process.ExitCode, stringBuilder?.ToString());
+        int exitCode = RunProcessInternal(info, updateStdOutput, default, cancellationToken);
+        return new PingResult(exitCode, stringBuilder?.ToString());
     }
 
-    public Task<PingResult> RunTaskAsync(string hostNameOrAddress)
+    public Task<PingResult> RunTaskAsync(string hostNameOrAddress, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() => Run(hostNameOrAddress));
+        return Task.Run(() => Run(hostNameOrAddress, cancellationToken));
     }
 
-    async public Task<PingResult> RunAsync(
-        string hostNameOrAddress, CancellationToken cancellationToken = default)
+    async public Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken cancellationToken = default)
     {
-        Task<PingResult> task = RunTaskAsync(hostNameOrAddress);
+        Task<PingResult> task = RunTaskAsync(hostNameOrAddress, cancellationToken);
         PingResult result = await task.WaitAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return result;
@@ -47,24 +48,24 @@ public class PingProcess
 
         void ProgressOutput(string? line)
         {
+            progress.Report(line);
             if (line is null)
             {
                 return;
             }
 
-            progress.Report(line);
             (stringBuilder ??= new StringBuilder())
                 .AppendLine(line);
         }
 
         void ProgressError(string? line)
         {
+            progress.Report(line);
             if (line is null)
             {
                 return;
             }
 
-            progress.Report(line);
             (stringBuilder ??= new StringBuilder())
                 .AppendLine(line);
         }
@@ -84,7 +85,6 @@ public class PingProcess
         return new PingResult(exitCode, combinedOutput);
     }
 
-
     async public Task<PingResult> RunAsync(IEnumerable<string> hostNameOrAddresses, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(hostNameOrAddresses);
@@ -92,9 +92,9 @@ public class PingProcess
         StringBuilder? stringBuilder = null;
         object syncRoot = new();
 
-        ParallelQuery<Task<int>>? allQuery = hostNameOrAddresses.AsParallel().Select(async host =>
+        Task<int>[] tasks = hostNameOrAddresses.AsParallel().Select(async host =>
         {
-            Task<PingResult> task = RunTaskAsync(host);
+            Task<PingResult> task = RunTaskAsync(host, cancellationToken);
             PingResult result = await task.WaitAsync(cancellationToken);
 
             if (!string.IsNullOrEmpty(result.StdOutput))
@@ -107,26 +107,14 @@ public class PingProcess
             }
 
             return result.ExitCode;
-        });
+        }).ToArray();
 
-        Task<int>[] allArray = allQuery.ToArray();
-
-        await Task.WhenAll(allArray);
-        int total = allArray.Aggregate(0, (total, item) => total + item.Result);
+        await Task.WhenAll(tasks);
+        int total = tasks.Aggregate(0, (total, item) => total + item.Result);
         string? combinedOutput = stringBuilder is null || stringBuilder.Length == 0
             ? null
             : stringBuilder.ToString();
         return new PingResult(total, combinedOutput);
-    }
-
-    // suppress CA1822 because this overload is intentionally left as an instance API for now
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Preserve instance API for tests/future extensibility.")]
-    async public Task<PingResult> RunLongRunningAsync(
-        string hostNameOrAddress, CancellationToken cancellationToken = default)
-    {
-        Task task = null!;
-        await task;
-        throw new NotImplementedException();
     }
 
     public Task<int> RunLongRunningAsync(ProcessStartInfo startInfo, Action<string?>? progressOutput,
@@ -135,28 +123,28 @@ public class PingProcess
         return Task.Factory.StartNew(
             () =>
             {
-                Process process = RunProcessInternal(startInfo, progressOutput, progressError, token);
-                return process.ExitCode;
+                return RunProcessInternal(startInfo, progressOutput, progressError, token);
             },
             token,
             TaskCreationOptions.LongRunning,
             TaskScheduler.Current);
     }
 
-    private Process RunProcessInternal(
+    protected virtual int RunProcessInternal(
         ProcessStartInfo startInfo,
         Action<string?>? progressOutput,
         Action<string?>? progressError,
         CancellationToken token)
     {
-        var process = new Process
+        using var process = new Process
         {
             StartInfo = UpdateProcessStartInfo(startInfo)
         };
+
         return RunProcessInternal(process, progressOutput, progressError, token);
     }
 
-    private Process RunProcessInternal(
+    private int RunProcessInternal(
         Process process,
         Action<string?>? progressOutput,
         Action<string?>? progressError,
@@ -167,7 +155,6 @@ public class PingProcess
         ManualResetEventSlim? errorDone =
             process.StartInfo.RedirectStandardError ? new(initialState: false) : null;
 
-
         process.EnableRaisingEvents = true;
         process.OutputDataReceived += OutputHandler;
         process.ErrorDataReceived += ErrorHandler;
@@ -176,7 +163,7 @@ public class PingProcess
         {
             if (!process.Start())
             {
-                return process;
+                return process.ExitCode;
             }
 
             token.Register(obj =>
@@ -194,7 +181,6 @@ public class PingProcess
                 }
             }, process);
 
-
             if (process.StartInfo.RedirectStandardOutput)
             {
                 process.BeginOutputReadLine();
@@ -204,13 +190,11 @@ public class PingProcess
                 process.BeginErrorReadLine();
             }
 
-            if (process.HasExited)
+            if (!process.HasExited)
             {
-                return process;
+                process.WaitForExit();
             }
-            process.WaitForExit();
 
-            // forward cancellation token to these waits so analyzer CA2016 is satisfied
             outputDone?.Wait(token);
             errorDone?.Wait(token);
         }
@@ -228,6 +212,7 @@ public class PingProcess
             {
                 process.CancelOutputRead();
             }
+
             process.OutputDataReceived -= OutputHandler;
             process.ErrorDataReceived -= ErrorHandler;
 
@@ -235,31 +220,25 @@ public class PingProcess
             {
                 process.Kill();
             }
-
         }
-        return process;
+
+        return process.ExitCode;
 
         void OutputHandler(object s, DataReceivedEventArgs e)
         {
+            progressOutput?.Invoke(e.Data);
             if (e.Data is null)
             {
                 outputDone?.Set();
-            }
-            else
-            {
-                progressOutput?.Invoke(e.Data);
             }
         }
 
         void ErrorHandler(object s, DataReceivedEventArgs e)
         {
+            progressError?.Invoke(e.Data);
             if (e.Data is null)
             {
                 errorDone?.Set();
-            }
-            else
-            {
-                progressError?.Invoke(e.Data);
             }
         }
     }
@@ -271,7 +250,6 @@ public class PingProcess
         startInfo.RedirectStandardOutput = true;
         startInfo.UseShellExecute = false;
         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
         return startInfo;
     }
 }
