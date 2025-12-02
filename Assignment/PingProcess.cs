@@ -44,7 +44,7 @@ public class PingProcess
     {
         ArgumentNullException.ThrowIfNull(progress);
 
-        StringBuilder? stringBuilder = null;
+        StringBuilder stringBuilder = new();
 
         var ProgressOutput = WrapProgress(progress, stringBuilder);
         var ProgressError = WrapProgress(progress, stringBuilder);
@@ -56,7 +56,7 @@ public class PingProcess
 
         int exitCode = await longRunningTask.WaitAsync(cancellationToken);
 
-        string? combinedOutput = stringBuilder?.Length > 0
+        string? combinedOutput = stringBuilder.Length > 0
             ? stringBuilder.ToString()
             : null;
 

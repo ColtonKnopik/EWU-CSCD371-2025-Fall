@@ -171,6 +171,22 @@ public class PingProcessTests
         }
     }
 
+    [TestMethod]
+    public async Task RunAsync_WithProgress_CapturesOutputAsItOccurs()
+    {
+        StringBuilder outputBuilder = new();
+        void ProgressHandler(string? line)
+        {
+            if (line != null)
+            {
+                outputBuilder.AppendLine(line);
+            }
+        }
+
+        var result = await Sut.RunAsync("localhost", new Progress<string?>(ProgressHandler), CancellationToken.None);
+        ValidatePingSuccess(result);
+    }
+
     // --- Helper for validating ping success across OSes ---
     private static void ValidatePingSuccess(PingResult result)
     {
