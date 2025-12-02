@@ -55,11 +55,10 @@ public class PingProcess
             RunLongRunningAsync(startInfo, ProgressOutput, ProgressError, cancellationToken);
 
         int exitCode = await longRunningTask.WaitAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
 
-        string? combinedOutput = stringBuilder is null || stringBuilder.Length == 0
-            ? null
-            : stringBuilder.ToString();
+        string? combinedOutput = stringBuilder?.Length > 0
+            ? stringBuilder.ToString()
+            : null;
 
         return new PingResult(exitCode, combinedOutput);
     }
@@ -90,9 +89,9 @@ public class PingProcess
 
         await Task.WhenAll(tasks);
         int total = tasks.Aggregate(0, (total, item) => total + item.Result);
-        string? combinedOutput = stringBuilder is null || stringBuilder.Length == 0
-            ? null
-            : stringBuilder.ToString();
+        string? combinedOutput = stringBuilder?.Length > 0
+            ? stringBuilder.ToString()
+            : null;
         return new PingResult(total, combinedOutput);
     }
 
