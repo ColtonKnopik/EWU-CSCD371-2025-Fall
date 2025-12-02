@@ -172,7 +172,7 @@ public class PingProcessTests
     }
 
     // --- Helper for validating ping success across OSes ---
-    private void ValidatePingSuccess(PingResult result)
+    private static void ValidatePingSuccess(PingResult result)
     {
         Assert.IsNotNull(result.StdOutput);
         Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
