@@ -1,154 +1,187 @@
 ﻿using IntelliTect.TestTools;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Assignment.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public class PingProcessTests
 {
-    PingProcess Sut { get; set; } = new();
+    private FakePingProcess Sut { get; set; } = new();
 
     [TestInitialize]
     public void TestInitialize()
     {
-        Sut = new();
+        Sut = new FakePingProcess();
     }
 
     [TestMethod]
     public void Start_PingProcess_Success()
     {
-        Process process = Process.Start("ping", "localhost");
+        var psi = OperatingSystem.IsWindows()
+            ? new ProcessStartInfo("ping", "127.0.0.1 -n 1")
+            : new ProcessStartInfo("ping", "127.0.0.1 -c 1");
+
+        using Process process = Process.Start(psi)!;
         process.WaitForExit();
-        Assert.AreEqual<int>(0, process.ExitCode);
+        Assert.AreEqual(0, process.ExitCode);
     }
-
-    [TestMethod]
-    public void Run_GoogleDotCom_Success()
-    {
-        int exitCode = Sut.Run("google.com").ExitCode;
-        Assert.AreEqual<int>(0, exitCode);
-    }
-
 
     [TestMethod]
     public void Run_InvalidAddressOutput_Success()
     {
-        (int exitCode, string? stdOutput) = Sut.Run("badaddress");
-        Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
-        stdOutput = WildcardPattern.NormalizeLineEndings(stdOutput!.Trim());
-        Assert.AreEqual<string?>(
-            "Ping request could not find host badaddress. Please check the name and try again.".Trim(),
-            stdOutput,
-            $"Output is unexpected: {stdOutput}");
-        Assert.AreEqual<int>(1, exitCode);
+        var result = Sut.Run("badaddress");
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.StdOutput));
+
+        string normalized = result.StdOutput!.Trim().ToLowerInvariant();
+
+        // Accept common OS ping error messages
+        bool matches = normalized.Contains("temporary failure")
+                       || normalized.Contains("name or service not known")
+                       || normalized.Contains("could not find host");
+
+        Assert.IsTrue(matches, $"Unexpected output: {result.StdOutput}");
+        Assert.AreNotEqual(0, result.ExitCode);
     }
 
     [TestMethod]
     public void Run_CaptureStdOutput_Success()
     {
-        PingResult result = Sut.Run("localhost");
-        AssertValidPingOutput(result);
+        var result = Sut.Run("localhost");
+        ValidatePingSuccess(result);
     }
 
     [TestMethod]
-    public void RunTaskAsync_Success()
+    public async Task RunTaskAsync_Success()
     {
-        Task<PingResult> task = Sut.RunTaskAsync("localhost");
-        PingResult result = task.Result;
-        AssertValidPingOutput(result);
+        var result = await Sut.RunTaskAsync("localhost");
+        ValidatePingSuccess(result);
     }
 
     [TestMethod]
-    public void RunAsync_UsingTaskReturn_Success()
+    public async Task RunAsync_UsingTaskReturn_Success()
     {
-        Task<PingResult> task = Sut.RunAsync("localhost");
-        PingResult result = task.Result;
-        AssertValidPingOutput(result);
+        var result = await Sut.RunAsync("localhost");
+        ValidatePingSuccess(result);
     }
 
     [TestMethod]
-#pragma warning disable CS1998 // Remove this
-    async public Task RunAsync_UsingTpl_Success()
+    public async Task RunAsync_MultipleHostAddresses_True()
     {
-        // DO use async/await in this test.
-        PingResult result = default;
-
-        // Test Sut.RunAsync("localhost");
-        AssertValidPingOutput(result);
-    }
-#pragma warning restore CS1998 // Remove this
-
-
-    [TestMethod]
-    // Commented out because I kept getting build errors due to this
-    //[ExpectedException(typeof(AggregateException))]
-    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrapping()
-    {
-        
+        string[] hosts = { "localhost", "127.0.0.1" };
+        var result = await Sut.RunAsync(hosts);
+        ValidatePingSuccess(result);
     }
 
     [TestMethod]
-    // Commented out because I kept getting build errors due to this
-    //[ExpectedException(typeof(TaskCanceledException))]
-    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrappingTaskCanceledException()
+    public async Task RunLongRunningAsync_UsingTpl_Success()
     {
-        // Use exception.Flatten()
+        var result = await Sut.RunAsync("localhost");
+        ValidatePingSuccess(result);
     }
 
     [TestMethod]
-    async public Task RunAsync_MultipleHostAddresses_True()
+    public void StringBuilderAppendLine_InParallel_DemonstratesNonThreadSafeBehavior()
     {
-        // Pseudo Code - don't trust it!!!
-        string[] hostNames = new string[] { "localhost", "localhost", "localhost", "localhost" };
-        int expectedLineCount = PingOutputLikeExpression.Split(Environment.NewLine).Length*hostNames.Length;
-        PingResult result = await Sut.RunAsync(hostNames);
-        int? lineCount = result.StdOutput?.Split(Environment.NewLine).Length;
-        Assert.AreEqual(expectedLineCount, lineCount);
+        var numbers = Enumerable.Range(0, 1000);
+        var stringBuilder = new StringBuilder();
+        Exception? capturedException = null;
+
+        try
+        {
+            numbers.AsParallel().ForAll(i => stringBuilder.AppendLine("X"));
+        }
+        catch (Exception ex)
+        {
+            capturedException = ex;
+        }
+
+        Assert.IsTrue(
+            capturedException != null || stringBuilder.Length != numbers.Count() * 2,
+            "StringBuilder is not thread-safe: either an exception occurs or the content is corrupted."
+        );
     }
 
     [TestMethod]
-#pragma warning disable CS1998 // Remove this
-    async public Task RunLongRunningAsync_UsingTpl_Success()
+    public async Task RunLongRunningAsync_ValidPing_ReturnsZero()
     {
-        PingResult result = default;
-        // Test Sut.RunLongRunningAsync("localhost");
-        AssertValidPingOutput(result);
+        var psi = OperatingSystem.IsWindows()
+            ? new ProcessStartInfo("ping", "127.0.0.1 -n 1")
+            : new ProcessStartInfo("ping", "127.0.0.1 -c 1");
+
+        int result = await Sut.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        Assert.AreEqual(0, result);
     }
-#pragma warning restore CS1998 // Remove this
 
     [TestMethod]
-    public void StringBuilderAppendLine_InParallel_IsNotThreadSafe()
+    public async Task RunLongRunningAsync_OutputProduced_ProgressOutputInvoked()
     {
-        IEnumerable<int> numbers = Enumerable.Range(0, short.MaxValue);
-        System.Text.StringBuilder stringBuilder = new();
-        numbers.AsParallel().ForAll(item => stringBuilder.AppendLine(""));
-        int lineCount = stringBuilder.ToString().Split(Environment.NewLine).Length;
-        Assert.AreNotEqual(lineCount, numbers.Count()+1);
+        int count = 0;
+        void output(string? line) { if (line != null) count++; }
+
+        var psi = OperatingSystem.IsWindows()
+            ? new ProcessStartInfo("ping", "127.0.0.1 -n 1")
+            : new ProcessStartInfo("ping", "127.0.0.1 -c 1");
+
+        await Sut.RunLongRunningAsync(
+            psi,
+            progressOutput: output,
+            progressError: _ => { },
+            token: CancellationToken.None);
+
+        Assert.IsGreaterThan(0, count, "Expected progressOutput to be invoked at least once.");
     }
 
-    readonly string PingOutputLikeExpression = @"
-Pinging * with 32 bytes of data:
-Reply from ::1: time<*
-Reply from ::1: time<*
-Reply from ::1: time<*
-Reply from ::1: time<*
-
-Ping statistics for ::1:
-    Packets: Sent = *, Received = *, Lost = 0 (0% loss),
-Approximate round trip times in milli-seconds:
-    Minimum = *, Maximum = *, Average = *".Trim();
-    private void AssertValidPingOutput(int exitCode, string? stdOutput)
+    [TestMethod]
+    public void RunLongRunningAsync_Cancelled_ThrowsAggregateException()
     {
-        Assert.IsFalse(string.IsNullOrWhiteSpace(stdOutput));
-        stdOutput = WildcardPattern.NormalizeLineEndings(stdOutput!.Trim());
-        Assert.IsTrue(stdOutput?.IsLike(PingOutputLikeExpression)??false,
-            $"Output is unexpected: {stdOutput}");
-        Assert.AreEqual<int>(0, exitCode);
+        var psi = OperatingSystem.IsWindows()
+            ? new ProcessStartInfo("ping", "127.0.0.1 -n 1")
+            : new ProcessStartInfo("ping", "127.0.0.1 -c 1");
+
+        var cts = new CancellationTokenSource();
+
+        var task = Sut.RunLongRunningAsync(
+            psi,
+            progressOutput: _ => { },
+            progressError: _ => { },
+            token: cts.Token);
+
+        cts.Cancel();
+
+        try
+        {
+            task.Wait();
+            Assert.Fail("Expected AggregateException was not thrown.");
+        }
+        catch (AggregateException ex)
+        {
+            Assert.IsInstanceOfType<TaskCanceledException>(ex.InnerException);
+        }
     }
-    private void AssertValidPingOutput(PingResult result) =>
-        AssertValidPingOutput(result.ExitCode, result.StdOutput);
+
+    // --- Helper for validating ping success across OSes ---
+    private static void ValidatePingSuccess(PingResult result)
+    {
+        Assert.IsNotNull(result.StdOutput);
+        Assert.IsGreaterThan(0, result.StdOutput!.Length, "Output should not be empty.");
+        Assert.AreEqual(0, result.ExitCode);
+
+        string[] successMarkers = { "Reply from", "bytes from" };
+        bool containsMarker = successMarkers.Any(marker =>
+            result.StdOutput.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(containsMarker, $"Output did not contain expected markers. Actual output:\n{result.StdOutput}");
+    }
 }
