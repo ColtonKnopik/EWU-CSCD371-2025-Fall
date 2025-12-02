@@ -46,29 +46,8 @@ public class PingProcess
 
         StringBuilder? stringBuilder = null;
 
-        void ProgressOutput(string? line)
-        {
-            progress.Report(line);
-            if (line is null)
-            {
-                return;
-            }
-
-            (stringBuilder ??= new StringBuilder())
-                .AppendLine(line);
-        }
-
-        void ProgressError(string? line)
-        {
-            progress.Report(line);
-            if (line is null)
-            {
-                return;
-            }
-
-            (stringBuilder ??= new StringBuilder())
-                .AppendLine(line);
-        }
+        var ProgressOutput = WrapProgress(progress, stringBuilder);
+        var ProgressError = WrapProgress(progress, stringBuilder);
 
         ProcessStartInfo startInfo = new("ping", hostNameOrAddress);
 
@@ -76,11 +55,10 @@ public class PingProcess
             RunLongRunningAsync(startInfo, ProgressOutput, ProgressError, cancellationToken);
 
         int exitCode = await longRunningTask.WaitAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
 
-        string? combinedOutput = stringBuilder is null || stringBuilder.Length == 0
-            ? null
-            : stringBuilder.ToString();
+        string? combinedOutput = stringBuilder?.Length > 0
+            ? stringBuilder.ToString()
+            : null;
 
         return new PingResult(exitCode, combinedOutput);
     }
@@ -111,9 +89,9 @@ public class PingProcess
 
         await Task.WhenAll(tasks);
         int total = tasks.Aggregate(0, (total, item) => total + item.Result);
-        string? combinedOutput = stringBuilder is null || stringBuilder.Length == 0
-            ? null
-            : stringBuilder.ToString();
+        string? combinedOutput = stringBuilder?.Length > 0
+            ? stringBuilder.ToString()
+            : null;
         return new PingResult(total, combinedOutput);
     }
 
@@ -172,7 +150,7 @@ public class PingProcess
                 {
                     try
                     {
-                        p.Kill();
+                        p.Kill(entireProcessTree: true);
                     }
                     catch (Win32Exception ex)
                     {
@@ -251,5 +229,21 @@ public class PingProcess
         startInfo.UseShellExecute = false;
         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
         return startInfo;
+    }
+
+    private static Action<string?> WrapProgress(
+    IProgress<string?> progress,
+    StringBuilder? stringBuilderRef)
+    {
+        return line =>
+        {
+            progress.Report(line);
+
+            if (line is null)
+                return;
+
+            (stringBuilderRef ??= new StringBuilder())
+                .AppendLine(line);
+        };
     }
 }
