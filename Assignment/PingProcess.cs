@@ -40,6 +40,7 @@ public class PingProcess
         return result;
     }
 
+    // Extra Credit
     public async Task<PingResult> RunAsync(string hostNameOrAddress, IProgress<string?> progress, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(progress);
