@@ -151,7 +151,7 @@ public class PingProcess
                 {
                     try
                     {
-                        p.Kill();
+                        p.Kill(entireProcessTree: true);
                     }
                     catch (Win32Exception ex)
                     {
@@ -247,5 +247,4 @@ public class PingProcess
                 .AppendLine(line);
         };
     }
-
 }
