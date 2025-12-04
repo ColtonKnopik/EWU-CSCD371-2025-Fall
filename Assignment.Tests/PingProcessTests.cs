@@ -102,8 +102,9 @@ public class PingProcessTests
             capturedException = ex;
         }
 
+        int expectedLength = numbers.Count() * ("X" + Environment.NewLine).Length;
         Assert.IsTrue(
-            capturedException != null || stringBuilder.Length != numbers.Count() * 2,
+            capturedException != null || stringBuilder.Length != expectedLength,
             "StringBuilder is not thread-safe: either an exception occurs or the content is corrupted."
         );
     }
