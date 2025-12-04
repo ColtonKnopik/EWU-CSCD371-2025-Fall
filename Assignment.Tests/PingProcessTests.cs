@@ -80,7 +80,7 @@ public class PingProcessTests
     }
 
     [TestMethod]
-    public async Task RunLongRunningAsync_UsingTpl_Success()
+    async public Task RunAsync_UsingTpl_Success()
     {
         var result = await Sut.RunAsync("localhost");
         ValidatePingSuccess(result);
