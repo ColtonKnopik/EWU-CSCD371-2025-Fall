@@ -58,9 +58,9 @@ public class PingProcessTests
     }
 
     [TestMethod]
-    public async Task RunTaskAsync_Success()
+    public void RunTaskAsync_Success()
     {
-        var result = await Sut.RunTaskAsync("localhost");
+        var result = Sut.RunTaskAsync("localhost").Result;
         ValidatePingSuccess(result);
     }
 
