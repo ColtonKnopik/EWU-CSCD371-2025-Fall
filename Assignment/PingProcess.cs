@@ -32,11 +32,10 @@ public class PingProcess
         return Task.Run(() => Run(hostNameOrAddress, cancellationToken));
     }
 
-    async public Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken cancellationToken = default)
+    public async Task<PingResult> RunAsync(string hostNameOrAddress, CancellationToken cancellationToken = default)
     {
         Task<PingResult> task = RunTaskAsync(hostNameOrAddress, cancellationToken);
-        PingResult result = await task.WaitAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        PingResult result = await task;
         return result;
     }
 
@@ -46,13 +45,13 @@ public class PingProcess
 
         StringBuilder stringBuilder = new();
 
-        var ProgressOutput = WrapProgress(progress, stringBuilder);
-        var ProgressError = WrapProgress(progress, stringBuilder);
+        var progressOutput = WrapProgress(progress, stringBuilder);
+        var progressError = WrapProgress(progress, stringBuilder);
 
         ProcessStartInfo startInfo = new("ping", hostNameOrAddress);
 
         Task<int> longRunningTask =
-            RunLongRunningAsync(startInfo, ProgressOutput, ProgressError, cancellationToken);
+            RunLongRunningAsync(startInfo, progressOutput, progressError, cancellationToken);
 
         int exitCode = await longRunningTask.WaitAsync(cancellationToken);
 
@@ -63,14 +62,14 @@ public class PingProcess
         return new PingResult(exitCode, combinedOutput);
     }
 
-    async public Task<PingResult> RunAsync(IEnumerable<string> hostNameOrAddresses, CancellationToken cancellationToken = default)
+    public async Task<PingResult> RunAsync(IEnumerable<string> hostNameOrAddresses, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(hostNameOrAddresses);
 
         StringBuilder? stringBuilder = null;
         object syncRoot = new();
 
-        Task<int>[] tasks = hostNameOrAddresses.AsParallel().Select(async host =>
+        Task<int>[] tasks = hostNameOrAddresses.Select(async host =>
         {
             Task<PingResult> task = RunTaskAsync(host, cancellationToken);
             PingResult result = await task.WaitAsync(cancellationToken);
@@ -105,7 +104,7 @@ public class PingProcess
             },
             token,
             TaskCreationOptions.LongRunning,
-            TaskScheduler.Current);
+            TaskScheduler.Default);
     }
 
     protected virtual int RunProcessInternal(
@@ -128,9 +127,9 @@ public class PingProcess
         Action<string?>? progressError,
         CancellationToken token)
     {
-        ManualResetEventSlim? outputDone =
+        using ManualResetEventSlim? outputDone =
             process.StartInfo.RedirectStandardOutput ? new(initialState: false) : null;
-        ManualResetEventSlim? errorDone =
+        using ManualResetEventSlim? errorDone =
             process.StartInfo.RedirectStandardError ? new(initialState: false) : null;
 
         process.EnableRaisingEvents = true;
