@@ -150,7 +150,7 @@ public class PingProcessTests
             ? new ProcessStartInfo("ping", "127.0.0.1 -n 1")
             : new ProcessStartInfo("ping", "127.0.0.1 -c 1");
 
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         var task = Sut.RunLongRunningAsync(
             psi,
