@@ -104,7 +104,7 @@ public class PingProcess
             },
             token,
             TaskCreationOptions.LongRunning,
-            TaskScheduler.Current);
+            TaskScheduler.Default);
     }
 
     protected virtual int RunProcessInternal(
@@ -127,9 +127,9 @@ public class PingProcess
         Action<string?>? progressError,
         CancellationToken token)
     {
-        ManualResetEventSlim? outputDone =
+        using ManualResetEventSlim? outputDone =
             process.StartInfo.RedirectStandardOutput ? new(initialState: false) : null;
-        ManualResetEventSlim? errorDone =
+        using ManualResetEventSlim? errorDone =
             process.StartInfo.RedirectStandardError ? new(initialState: false) : null;
 
         process.EnableRaisingEvents = true;
