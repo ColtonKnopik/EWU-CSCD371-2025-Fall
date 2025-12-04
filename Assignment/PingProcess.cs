@@ -45,13 +45,13 @@ public class PingProcess
 
         StringBuilder stringBuilder = new();
 
-        var ProgressOutput = WrapProgress(progress, stringBuilder);
-        var ProgressError = WrapProgress(progress, stringBuilder);
+        var progressOutput = WrapProgress(progress, stringBuilder);
+        var progressError = WrapProgress(progress, stringBuilder);
 
         ProcessStartInfo startInfo = new("ping", hostNameOrAddress);
 
         Task<int> longRunningTask =
-            RunLongRunningAsync(startInfo, ProgressOutput, ProgressError, cancellationToken);
+            RunLongRunningAsync(startInfo, progressOutput, progressError, cancellationToken);
 
         int exitCode = await longRunningTask.WaitAsync(cancellationToken);
 
