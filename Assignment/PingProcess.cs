@@ -232,7 +232,7 @@ public class PingProcess
 
     private static Action<string?> WrapProgress(
     IProgress<string?> progress,
-    StringBuilder? stringBuilderRef)
+    StringBuilder stringBuilder)
     {
         return line =>
         {
@@ -241,8 +241,7 @@ public class PingProcess
             if (line is null)
                 return;
 
-            (stringBuilderRef ??= new StringBuilder())
-                .AppendLine(line);
+            stringBuilder.AppendLine(line);
         };
     }
 }
