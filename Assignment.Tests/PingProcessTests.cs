@@ -87,6 +87,40 @@ public class PingProcessTests
     }
 
     [TestMethod]
+    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrapping()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var task = Sut.RunAsync("localhost", cts.Token);
+        try
+        {
+            task.Wait();
+            Assert.Fail("Expected AggregateException was not thrown.");
+        }
+        catch (AggregateException ex)
+        {
+            Assert.IsInstanceOfType<AggregateException>(ex);
+        }
+    }
+
+    [TestMethod]
+    public void RunAsync_UsingTplWithCancellation_CatchAggregateExceptionWrappingTaskCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var task = Sut.RunAsync("localhost", cts.Token);
+        try
+        {
+            task.Wait();
+            Assert.Fail("Expected AggregateException was not thrown.");
+        }
+        catch (AggregateException ex)
+        {
+            Assert.IsInstanceOfType<TaskCanceledException>(ex.InnerException);
+        }
+    }
+
+    [TestMethod]
     public void StringBuilderAppendLine_InParallel_DemonstratesNonThreadSafeBehavior()
     {
         var numbers = Enumerable.Range(0, 1000);
